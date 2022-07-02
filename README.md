@@ -7,7 +7,7 @@ The implementation depends on the following commonly used packages, all of which
 | Package       | Version                          |
 | ------------- | -------------------------------- |
 | PyTorch       | ≥ 1.8.1                          |
-| numpy         |  |
+| numpy         | 1.21.0                           |
 | opencv-python | 4.5.1.48                         |
 | pandas        | 1.2.3                            |
 

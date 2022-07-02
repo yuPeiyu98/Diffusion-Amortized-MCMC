@@ -20,11 +20,11 @@ MAX_ITERS: 2e6                # maximum number of iterations to train the model
 MCMC_SAMPLER: LD              # name of the MCMC sampler ("LD": Langevin Dynamics)
 MCMC_STEPS: 60                # number of iterations for MCMC sampling
 DELTA: 0.4                    # step size for MCMC iteration
-SIGMA: 0.25					  # scaling factor for reconstruction loss
+SIGMA: 0.25                   # scaling factor for reconstruction loss
 F_WEIGHT: 1                   # weight for learning the inverse mapping
 
 INPUT_DIM: 3                  # input image dim for training
-IM_SIZE: 32					  # input image shape
+IM_SIZE: 32                   # input image shape
 LAT_DIM: 3                    # dimension of latent vector
 USE_SPC_NORM: 0               # use spectral normalization or not (0: off, 1: on)
 INIT_WEIGHTS: 0               # use specified weight initialization or not (0: off, 1: on)
