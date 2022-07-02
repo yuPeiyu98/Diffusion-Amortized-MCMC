@@ -1,0 +1,36 @@
+SEED: 10                      # random seed
+GPU: [0]                      # list of gpu ids
+DEBUG: 0                      # turn on debugging mode or not (0: off, 1: on)
+EVAL_ONLY: 0                  # turn on forward only mode or not (0: off, 1: on)
+
+DATA: CIFAR10                 # alias of dataset
+ROOT_DIR: '/home/peiyu/workspace/UNetDiff/workspace/data/CIFAR10'
+TRAIN_SPLIT: 0                # which data-split to use (-1: all, 0: training, 2: testing)
+VAL_SPLIT: 1 
+TEST_SPLIT: 1
+
+MODEL: ABP
+
+LR: 0.0001                    # learning rate    
+BETA1': 0.5                   # adam optimizer beta1
+BETA2': 0.999                 # adam optimizer beta2
+BATCH_SIZE: 64                # input batch size for training
+MAX_ITERS: 2e6                # maximum number of iterations to train the model
+
+MCMC_SAMPLER: LD              # name of the MCMC sampler ("LD": Langevin Dynamics)
+MCMC_STEPS: 60                # number of iterations for MCMC sampling
+DELTA: 0.4                    # step size for MCMC iteration
+SIGMA: 0.25					  # scaling factor for reconstruction loss
+F_WEIGHT: 1                   # weight for learning the inverse mapping
+
+INPUT_DIM: 3                  # input image dim for training
+IM_SIZE: 32					  # input image shape
+LAT_DIM: 3                    # dimension of latent vector
+USE_SPC_NORM: 0               # use spectral normalization or not (0: off, 1: on)
+INIT_WEIGHTS: 0               # use specified weight initialization or not (0: off, 1: on)
+
+SAVE_INTERVAL: 1000           # how many iterations to wait before saving model (0: never)
+SAMPLE_INTERVAL: 1000         # how many iterations to wait before sampling (0: never)
+SAMPLE_SIZE: 12               # number of images to sample
+EVAL_INTERVAL: 0              # how many iterations to wait before model evaluation (0: never)
+LOG_INTERVAL: 10              # how many iterations to wait before logging training status (0: never)
