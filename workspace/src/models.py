@@ -225,7 +225,7 @@ class ABPModel(BaseModel):
     def wake_forward(self, x):
         with torch.no_grad():
             z_hat = self._encoding(x)
-        z = self._langevin_posterior_sampler(z_hat)
+        z = self._langevin_posterior_sampler(x, z_hat)
         return self._decoding(z), z_hat, z
 
     def update_model(self, x, x_rec, z, z_inf):
