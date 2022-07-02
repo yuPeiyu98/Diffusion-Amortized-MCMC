@@ -212,7 +212,7 @@ class ABPModel(BaseModel):
 
         return f
 
-    def sleep_forward(self):
+    def sleep_forward(self, x):
         z_prior = torch.randn(
                     x.size(0), self.latent_dim, self.im_size, self.im_size,
                     device=x.device
@@ -250,7 +250,7 @@ class ABPModel(BaseModel):
     def learn(self, x):
         self.iteration += 1
 
-        x_prior, z_prior_hat, z_prior = self.sleep_forward()
+        x_prior, z_prior_hat, z_prior = self.sleep_forward(x)
         x_recon, z_hat, z = self.wake_forward(x)
 
         l_rc, l_f = self.update_model(x, x_recon, z_prior, z_prior_hat)

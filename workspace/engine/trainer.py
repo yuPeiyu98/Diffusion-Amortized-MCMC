@@ -77,7 +77,7 @@ def run_ABP(model, config, train_dataset, val_dataset):
         items = next(sample_iterator)
         img, __ = cuda(items, config.DEVICE)
         
-        x_prior, z_prior_hat, z_prior = model.sleep_forward()
+        x_prior, z_prior_hat, z_prior = model.sleep_forward(img)
         img_hat, z_hat, z = model.wake_forward(img)        
 
         images = stitch_images(
