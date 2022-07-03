@@ -11,7 +11,7 @@ from data.dataset import *
 from src.utils import Config
 from src.models import ABPModel
 from engine.trainer import run_ABP
-# from engine.evaluator import test_ABP
+from engine.evaluator import test_ABP
 from shutil import copyfile
 
 ###################################################################
@@ -136,9 +136,9 @@ def main(mode=None):
             )
 
     # testing
-    # eval('test_{}'.format(config.MODEL))(
-    #     model, config, train_dataset, val_dataset
-    # )    
+    eval('test_{}'.format(config.MODEL))(
+        model, config, train_dataset, val_dataset
+    )    
 
 if __name__ == "__main__":
     main()

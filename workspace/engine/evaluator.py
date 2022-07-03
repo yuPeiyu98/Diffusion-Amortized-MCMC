@@ -6,6 +6,7 @@ import os.path as osp
 import random
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
 from data.dataset import *
 
@@ -135,7 +136,7 @@ def calculate_likelihood(model, data, sample_num=500):
 ##### + single UVAE
 
 def test_ABP(model, config, train_dataset, val_dataset):
-    token = 'iter300_viz'
+    token = 'viz'
     samples_path = os.path.join(
         config.PATH, 'samples_test_{}'.format(token)
     )
@@ -146,7 +147,7 @@ def test_ABP(model, config, train_dataset, val_dataset):
         config.PATH, 'log_' + model.model_name + '_test_{}.dat'.format(token)
     )
 
-    def test_ll():
+    def test_mse():
         test_loader = DataLoader(
             dataset=val_dataset,
             batch_size=config.BATCH_SIZE,
@@ -170,34 +171,29 @@ def test_ABP(model, config, train_dataset, val_dataset):
 
         epoch = 0
 
-        cum_ll = 0
-        cnt_ll = 0
+        cum_mse = 0
+        cnt_mse = 0
 
         for iteration, items in enumerate(test_loader):            
             model.eval()
 
-            items = cuda(items, config.DEVICE)
-            scaled_seq, seq = items[:len(items) // 2], items[len(items) // 2:]
+            img, __ = cuda(items, config.DEVICE)
+
+            # forward
+            img_hat, z_hat, z = model.wake_forward(img)
 
             with torch.no_grad():
-                # forward
-                # img_hat, __, __, __ = model(img)
-
-                #######################################
-                ### TODO: Implement single-scale VAE###
-                #######################################
-
-                ll = calculate_likelihood(model, img, sample_num=500)
-                cum_ll += ll
-                cnt_ll += 1
+                mse = F.mse_loss(img_hat, img)
+            cum_mse += mse
+            cnt_mse += 1
 
             logs = [
                 ("epoch", epoch),
                 ("iter", iteration),
-                ("ll", ll)
+                ("mse", mse)
             ]
 
-            # progbar.add(len(img), values=logs)            
+            progbar.add(len(img), values=logs)            
 
             # log model at checkpoints
             if bool(config.LOG_INTERVAL) and \
@@ -212,8 +208,8 @@ def test_ABP(model, config, train_dataset, val_dataset):
                     samples_path, model.model_name
                 )
                 
-        print('\nLog likelihood: {}'.format(cum_ll / cnt_ll))
-        print('\nEnd LL testing....')
+        print('\nMSE: {}'.format(cum_mse / cnt_mse))
+        print('\nEnd MSE testing....')
 
     def test_fid():
         train_loader = DataLoader(
@@ -243,7 +239,8 @@ def test_ABP(model, config, train_dataset, val_dataset):
         for iteration, items in enumerate(train_loader):
             model.eval()
 
-            # img, __ = cuda(items, config.DEVICE)
+            img, __ = cuda(items, config.DEVICE)
+
             # z = torch.randn(
             #         size=(len(img),
             #               int(config.LAT_DIM),
@@ -265,12 +262,12 @@ def test_ABP(model, config, train_dataset, val_dataset):
             save_gen(
                 img, cnt, gen_path, model.model_name, 'gt'
             )
-            save_gen(
-                img_hat, cnt, gen_path, model.model_name, 'gen'
-            )
+            # save_gen(
+            #     img_hat, cnt, gen_path, model.model_name, 'gen'
+            # )
             cnt += len(img) 
                 
         print('\nEnd FID testing....')        
 
-    test_ll()
+    test_mse()
     # test_fid()
