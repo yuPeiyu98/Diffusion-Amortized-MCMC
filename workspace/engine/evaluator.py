@@ -184,7 +184,7 @@ def test_ABP(model, config, train_dataset, val_dataset):
             img_hat, z_hat, z = model.wake_forward(img)
 
             with torch.no_grad():
-                mse = F.mse_loss(img_hat, img)
+                mse = F.mse_loss(img_hat, img).item()
             cum_mse += mse
             cnt_mse += 1
 

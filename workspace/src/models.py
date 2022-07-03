@@ -164,7 +164,7 @@ class ABPModel(BaseModel):
         self.f_weight = float(config.F_WEIGHT)
 
     @staticmethod
-    def _set_requires_grad(self, nets, requires_grad=False):
+    def _set_requires_grad(nets, requires_grad=False):
         """Set requies_grad=False for all the networks to 
            avoid unnecessary computations
         Parameters:
