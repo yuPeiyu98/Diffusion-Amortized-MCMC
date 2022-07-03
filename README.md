@@ -11,6 +11,10 @@ The implementation depends on the following commonly used packages, all of which
 | opencv-python | 4.5.1.48                         |
 | pandas        | 1.2.3                            |
 
+## Data 
+
+To train the model on CIFAR-10 dataset, please download the file from https://drive.google.com/file/d/1PmKrfeCx_LHWcmhoqESosYGMmYw_MjKH/view?usp=sharing, and place the decompressed files under `data/CIFAR10` folder.
+
 ## Training
 
 ```bash
