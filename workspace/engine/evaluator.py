@@ -6,7 +6,6 @@ import os.path as osp
 import random
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from data.dataset import *
 
@@ -17,6 +16,8 @@ from src.utils import stitch_images, imsave
 
 from src.models import ABPModel
 from torch.utils.data import DataLoader
+
+import torch.nn.functional as F
 
 ###################################################################
 ######################## helper functions #########################
