@@ -650,7 +650,7 @@ class UNet(BaseNetwork):
 
         self.d_blocks = nn.ModuleList(self.d_blocks)
 
-        self.output_mean = Conv1x1Head(
+        self.output = Conv1x1Head(
             module_name='Conv1x1',
             in_channels=block_chns[-1], 
             out_channels=output_dim,
@@ -713,8 +713,8 @@ class UNet(BaseNetwork):
             x = d_block(x)
 
         if self.use_var_head:
-            return self.output_mean(x), self.output_var(x)
-        return self.output_mean(x)
+            return self.output(x), self.output_var(x)
+        return self.output(x)
 
 ###################################################################
 ########################## MISC. NETS #############################

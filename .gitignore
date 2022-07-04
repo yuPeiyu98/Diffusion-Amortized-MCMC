@@ -1,5 +1,5 @@
 # checkpoints
-data/CIFAR10
+CIFAR10/
 checkpoints/
 
 # Byte-compiled / optimized / DLL files

@@ -1,5 +1,5 @@
 SEED: 10                      # random seed
-GPU: [0]                      # list of gpu ids
+GPU: [1]                      # list of gpu ids
 DEBUG: 0                      # turn on debugging mode or not (0: off, 1: on)
 EVAL_ONLY: 0                  # turn on forward only mode or not (0: off, 1: on)
 
