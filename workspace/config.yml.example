@@ -26,6 +26,7 @@ F_WEIGHT: 1                   # weight for learning the inverse mapping
 INPUT_DIM: 3                  # input image dim for training
 IM_SIZE: 32                   # input image shape
 LAT_DIM: 3                    # dimension of latent vector
+USE_VAR_HEAD: 1               # use log-var output for U-Net encoder (0: off, 1: on)
 USE_SPC_NORM: 0               # use spectral normalization or not (0: off, 1: on)
 INIT_WEIGHTS: 0               # use specified weight initialization or not (0: off, 1: on)
 

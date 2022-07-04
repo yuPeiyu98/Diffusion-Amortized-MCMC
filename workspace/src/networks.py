@@ -600,10 +600,13 @@ class UNet(BaseNetwork):
         module_name='UNetDecoder',
         block_chns=[3 + 2 + 64, 128, 256, 128, 64],
         r=.01,
+        use_var_head=False,
         use_spc_norm=False,
         init_weights=True
     ):
         super(UNet, self).__init__(module_name=module_name)
+
+        self.use_var_head = use_var_head
 
         ##### + encoding blocks
         self.e_blocks = [
@@ -647,7 +650,7 @@ class UNet(BaseNetwork):
 
         self.d_blocks = nn.ModuleList(self.d_blocks)
 
-        self.output = Conv1x1Head(
+        self.output_mean = Conv1x1Head(
             module_name='Conv1x1',
             in_channels=block_chns[-1], 
             out_channels=output_dim,
@@ -656,6 +659,16 @@ class UNet(BaseNetwork):
             use_spc_norm=use_spc_norm,
             init_weights=init_weights
         )
+        if use_var_head:
+            self.output_var = Conv1x1Head(
+                module_name='Conv1x1',
+                in_channels=block_chns[-1], 
+                out_channels=output_dim,
+                use_bias=False,
+                r=r,
+                use_spc_norm=use_spc_norm,
+                init_weights=init_weights
+            )
 
         if init_weights:
             self.init_weights()        
@@ -699,7 +712,9 @@ class UNet(BaseNetwork):
                   else torch.cat([x, f], dim=1)
             x = d_block(x)
 
-        return self.output(x)
+        if self.use_var_head:
+            return self.output_mean(x), self.output_var(x)
+        return self.output_mean(x)
 
 ###################################################################
 ########################## MISC. NETS #############################

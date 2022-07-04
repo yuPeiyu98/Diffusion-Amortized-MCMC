@@ -119,6 +119,7 @@ class ABPModel(BaseModel):
         self.delta = float(config.DELTA)
 
         # network configuration
+        self.use_var_head = bool(config.USE_VAR_HEAD)
         self.use_scaled_output = use_scaled_output
 
         self.input_dim = int(config.INPUT_DIM) \
@@ -134,9 +135,10 @@ class ABPModel(BaseModel):
             block_chns=[
                 self.input_dim, 128, 256, 128, 64],
             r=.01,
+            use_var_head=bool(config.USE_VAR_HEAD),
             use_spc_norm=bool(config.USE_SPC_NORM),
             init_weights=bool(config.INIT_WEIGHTS)
-        )        
+        )
         self.decoder = UNet(
             output_dim=self.input_dim,
             module_name='DecoderUNet',
@@ -145,13 +147,13 @@ class ABPModel(BaseModel):
             r=.01,
             use_spc_norm=bool(config.USE_SPC_NORM),
             init_weights=bool(config.INIT_WEIGHTS)
-        )        
+        )
 
         # optims
         self.optimizer = optim.Adam(
             params=[
                 {'params': self.encoder.parameters()},
-                {'params': self.decoder.parameters()}                
+                {'params': self.decoder.parameters()}
             ],
             lr=float(config.LR),
             betas=(float(config.BETA1), float(config.BETA2))
@@ -200,7 +202,11 @@ class ABPModel(BaseModel):
         return z_hat
 
     def _encoding(self, x):
-        z = self.encoder(x)        
+        if self.use_var_head:
+            z_mean, z_var = self.encoder(x)
+            z = z_mean + torch.randn_like(z_mean) * (0.5 * z_var).exp()
+        else:
+            z = self.encoder(x)
 
         return z
 
