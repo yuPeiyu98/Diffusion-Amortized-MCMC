@@ -10,7 +10,6 @@ import torch.optim as optim
 from functools import partial
 
 from .networks import UNet
-from .hmc_utils import leapfrog
 
 ###################################################################
 ####################### BASE MODEL & UTILS ########################
@@ -308,7 +307,7 @@ class ABPModel(BaseModel):
             z = self._langevin_posterior_sampler(x, z_hat)
         elif self.sampler == "HMC":
             z = self._hmc_posterior_sampler(x, z_hat)
-            
+
         return self._decoding(z), x_recon_hat, z_hat, z
 
     def update_model(self, x, x_rec, z, z_inf):

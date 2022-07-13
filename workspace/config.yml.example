@@ -20,7 +20,7 @@ MAX_ITERS: 2e6                # maximum number of iterations to train the model
 MCMC_SAMPLER: HMC             # name of the MCMC sampler ("LD": Langevin Dynamics, "HMC": Hamiltonian Monte Carlo)
 MCMC_STEPS: 60                # number of iterations for MCMC sampling
 DELTA: 0.1                    # step size for MCMC iteration
-RATIO: 1.02					  # adjustment ratio for MCMC step size (only for HMC sampler)
+RATIO: 1.02                   # adjustment ratio for MCMC step size (only for HMC sampler)
 L: 3                          # number of leapfrog steps
 
 SIGMA: 0.025                  # scaling factor for reconstruction loss
