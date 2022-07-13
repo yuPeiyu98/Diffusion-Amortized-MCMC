@@ -22,6 +22,7 @@ MCMC_STEPS: 60                # number of iterations for MCMC sampling
 DELTA: 0.1                    # step size for MCMC iteration
 RATIO: 1.02                   # adjustment ratio for MCMC step size (only for HMC sampler)
 L: 3                          # number of leapfrog steps
+ACCEPT_THRESHOLD: 0.651       # number of leapfrog steps
 
 SIGMA: 0.025                  # scaling factor for reconstruction loss
 F_WEIGHT: 1                   # weight for learning the inverse mapping

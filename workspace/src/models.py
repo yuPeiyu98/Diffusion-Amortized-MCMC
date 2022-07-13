@@ -29,7 +29,7 @@ def Leapfrog(x, energy, step_size, L=3):
     It returns the (possibly) updated sample and the acceptance rate 
     of this batch data
     """        
-    # initialize the dynamics and the momentum    
+    # initialize the dynamics and the momentum
     p0, _x = torch.randn_like(x), x.clone().detach().requires_grad_(True)
     
     # first half-step update for the momentum and 
@@ -43,8 +43,8 @@ def Leapfrog(x, energy, step_size, L=3):
     p = p + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
 
     # Metropolis-Hastings Correction
-    H0 = -energy(x) + 0.5 * torch.sum(p0 ** 2, 1)
-    H1 = -energy(_x) + 0.5 * torch.sum(p ** 2, 1)    
+    H0 = -energy(x) + 0.5 * torch.sum(p0.square().view(p0.size(0), -1), 1)
+    H1 = -energy(_x) + 0.5 * torch.sum(p.square().view(p.view(0), -1), 1)    
     p_acc = torch.minimum(torch.ones_like(H0), torch.exp(H0 - H1))
     replace_idx = p_acc > torch.rand_like(p_acc)
     x[replace_idx] = _x[replace_idx].detach().clone()
@@ -162,6 +162,7 @@ class ABPModel(BaseModel):
         self.delta = float(config.DELTA)
         self.step_mul = float(config.RATIO)
         self.L = int(config.L)
+        self.accept_th = float(config.ACCEPT_THRESHOLD)
 
         # network configuration
         self.use_var_head = bool(config.USE_VAR_HEAD)
@@ -232,7 +233,7 @@ class ABPModel(BaseModel):
         # langevin sampling
         for __ in range(self.mcmc_steps):
             z_hat = z_hat.requires_grad_(True)            
-            nll = self._log_prob_joint(x, z_hat)
+            nll = self._neg_log_prob_joint(z_hat, x).sum()
             
             d_z = torch.autograd.grad(nll, z_hat)[0]
             z_hat = z_hat - 0.5 * (self.delta ** 2) * d_z \
@@ -252,10 +253,10 @@ class ABPModel(BaseModel):
             z_hat = z_hat.requires_grad_(True)
 
             z_hat, acc_rate = Leapfrog(
-                                x=z_hat, energy=partial(self._log_prob_joint, x=x), 
+                                x=z_hat, energy=partial(self._neg_log_prob_joint, x=x), 
                                 step_size=step_sz, L=self.L
                               )
-            if acc_rate > 0.651:
+            if acc_rate > self.accept_th:
                 step_sz *= self.step_mul
             else:
                 step_sz /= self.step_mul
@@ -264,11 +265,11 @@ class ABPModel(BaseModel):
 
         return z_hat        
 
-    def _log_prob_joint(self, z, x):
+    def _neg_log_prob_joint(self, z, x):
         log_x_z = .5 * F.mse_loss(
                         self._decoding(z), x, reduction='none'
-                    ).div(self.sigma ** 2).sum()
-        log_z = .5 * z.square().sum()
+                    ).div(self.sigma ** 2).sum(dim=[1, 2, 3])
+        log_z = .5 * z.square().sum(dim=1)
         return log_x_z + log_z
 
     def _encoding(self, x):
