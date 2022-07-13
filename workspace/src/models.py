@@ -30,7 +30,7 @@ def Leapfrog(x, energy, step_size, L=3):
     of this batch data
     """        
     # initialize the dynamics and the momentum    
-    p0, _x = torch.randn_like(_x), x.clone().detach().requires_grad_(True)
+    p0, _x = torch.randn_like(x), x.clone().detach().requires_grad_(True)
     
     # first half-step update for the momentum and 
     # the full step update for the data
@@ -264,7 +264,7 @@ class ABPModel(BaseModel):
 
         return z_hat        
 
-    def _log_prob_joint(self, x, z):
+    def _log_prob_joint(self, z, x):
         log_x_z = .5 * F.mse_loss(
                         self._decoding(z), x, reduction='none'
                     ).div(self.sigma ** 2).sum()
