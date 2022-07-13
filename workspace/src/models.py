@@ -250,10 +250,8 @@ class ABPModel(BaseModel):
         # hmc sampling
         step_sz = self.delta
         for __ in range(self.mcmc_steps):
-            z_hat = z_hat.requires_grad_(True)
-
             z_hat, acc_rate = Leapfrog(
-                                x=z_hat, energy=partial(self._neg_log_prob_joint, x=x), 
+                                x=z_hat.detach(), energy=partial(self._neg_log_prob_joint, x=x), 
                                 step_size=step_sz, L=self.L
                               )
             if acc_rate > self.accept_th:
