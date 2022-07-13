@@ -1,5 +1,5 @@
 SEED: 10                      # random seed
-GPU: [1]                      # list of gpu ids
+GPU: [0]                      # list of gpu ids
 DEBUG: 0                      # turn on debugging mode or not (0: off, 1: on)
 EVAL_ONLY: 0                  # turn on forward only mode or not (0: off, 1: on)
 
@@ -17,10 +17,13 @@ BETA2': 0.999                 # adam optimizer beta2
 BATCH_SIZE: 64                # input batch size for training
 MAX_ITERS: 2e6                # maximum number of iterations to train the model
 
-MCMC_SAMPLER: LD              # name of the MCMC sampler ("LD": Langevin Dynamics)
+MCMC_SAMPLER: HMC             # name of the MCMC sampler ("LD": Langevin Dynamics, "HMC": Hamiltonian Monte Carlo)
 MCMC_STEPS: 60                # number of iterations for MCMC sampling
-DELTA: 0.4                    # step size for MCMC iteration
-SIGMA: 0.25                   # scaling factor for reconstruction loss
+DELTA: 0.1                    # step size for MCMC iteration
+RATIO: 1.02					  # adjustment ratio for MCMC step size (only for HMC sampler)
+L: 3                          # number of leapfrog steps
+
+SIGMA: 0.025                  # scaling factor for reconstruction loss
 F_WEIGHT: 1                   # weight for learning the inverse mapping
 
 INPUT_DIM: 3                  # input image dim for training

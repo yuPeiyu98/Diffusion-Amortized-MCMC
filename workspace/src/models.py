@@ -7,11 +7,54 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
+from functools import partial
+
 from .networks import UNet
+from .hmc_utils import leapfrog
 
 ###################################################################
 ####################### BASE MODEL & UTILS ########################
 ###################################################################
+
+##### + HMC 
+
+def Leapfrog(x, energy, step_size, L=3):
+    """ Leapfrog integrator using Euclidean-Gaussian kinematic energy
+
+    Args:
+        x        -- initial samples
+        energy   -- potential energy term U()
+        L        -- iterations for leapfrog integrator
+        stp_size -- step size for leapfrog integrator 
+
+    It returns the (possibly) updated sample and the acceptance rate 
+    of this batch data
+    """        
+    # initialize the dynamics and the momentum    
+    p0, _x = torch.randn_like(_x), x.clone().detach().requires_grad_(True)
+    
+    # first half-step update for the momentum and 
+    # the full step update for the data
+    p = p0 + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+    _x = _x + step_size * p
+    for __ in range(L):
+        p = p + step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+        _x = _x + step_size * p
+    # the last half-step update for the momentum    
+    p = p + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+
+    # Metropolis-Hastings Correction
+    H0 = -energy(x) + 0.5 * torch.sum(p0 ** 2, 1)
+    H1 = -energy(_x) + 0.5 * torch.sum(p ** 2, 1)    
+    p_acc = torch.minimum(torch.ones_like(H0), torch.exp(H0 - H1))
+    replace_idx = p_acc > torch.rand_like(p_acc)
+    x[replace_idx] = _x[replace_idx].detach().clone()
+
+    acc_rate = torch.mean(replace_idx.float()).item()
+
+    return x, acc_rate
+
+##### + Base Model
 
 class BaseModel(nn.Module):
 
@@ -117,6 +160,8 @@ class ABPModel(BaseModel):
         # langevin steps
         self.mcmc_steps = int(config.MCMC_STEPS)
         self.delta = float(config.DELTA)
+        self.step_mul = float(config.RATIO)
+        self.L = int(config.L)
 
         # network configuration
         self.use_var_head = bool(config.USE_VAR_HEAD)
@@ -186,20 +231,45 @@ class ABPModel(BaseModel):
 
         # langevin sampling
         for __ in range(self.mcmc_steps):
-            z_hat = z_hat.requires_grad_(True)
-            cond_nll = 0.5 * F.mse_loss(
-                            self._decoding(z_hat), x, reduction='none'
-                        ).div(self.sigma ** 2)
-            nll = cond_nll.sum() + .5 * z_hat.square().sum()
+            z_hat = z_hat.requires_grad_(True)            
+            nll = self._log_prob_joint(x, z_hat)
             
             d_z = torch.autograd.grad(nll, z_hat)[0]
             z_hat = z_hat - 0.5 * (self.delta ** 2) * d_z \
                           + self.delta * torch.randn_like(z_hat)
             z_hat = z_hat.detach()
         
-        self._set_requires_grad(self.decoder, requires_grad=True)        
+        self._set_requires_grad(self.decoder, requires_grad=True)
 
         return z_hat
+
+    def _hmc_posterior_sampler(self, x, z_hat):
+        self._set_requires_grad(self.decoder, requires_grad=False)
+
+        # hmc sampling
+        step_sz = self.delta
+        for __ in range(self.mcmc_steps):
+            z_hat = z_hat.requires_grad_(True)
+
+            z_hat, acc_rate = Leapfrog(
+                                x=z_hat, energy=partial(self._log_prob_joint, x=x), 
+                                step_size=step_sz, L=self.L
+                              )
+            if acc_rate > 0.651:
+                step_sz *= self.step_mul
+            else:
+                step_sz /= self.step_mul
+        
+        self._set_requires_grad(self.decoder, requires_grad=True)        
+
+        return z_hat        
+
+    def _log_prob_joint(self, x, z):
+        log_x_z = .5 * F.mse_loss(
+                        self._decoding(z), x, reduction='none'
+                    ).div(self.sigma ** 2).sum()
+        log_z = .5 * z.square().sum()
+        return log_x_z + log_z
 
     def _encoding(self, x):
         if self.use_var_head:
