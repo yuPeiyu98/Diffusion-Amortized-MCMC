@@ -44,7 +44,7 @@ def Leapfrog(x, energy, step_size, L=3):
 
     # Metropolis-Hastings Correction
     H0 = -energy(x) + 0.5 * torch.sum(p0.square().view(p0.size(0), -1), 1)
-    H1 = -energy(_x) + 0.5 * torch.sum(p.square().view(p.view(0), -1), 1)    
+    H1 = -energy(_x) + 0.5 * torch.sum(p.square().view(p.size(0), -1), 1)    
     p_acc = torch.minimum(torch.ones_like(H0), torch.exp(H0 - H1))
     replace_idx = p_acc > torch.rand_like(p_acc)
     x[replace_idx] = _x[replace_idx].detach().clone()
