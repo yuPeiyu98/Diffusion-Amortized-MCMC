@@ -269,7 +269,7 @@ class ABPModel(BaseModel):
         log_x_z = .5 * F.mse_loss(
                         self._decoding(z), x, reduction='none'
                     ).div(self.sigma ** 2).sum(dim=[1, 2, 3])
-        log_z = .5 * z.square().sum(dim=1)
+        log_z = .5 * z.square().view(z.size(0), -1).sum(dim=1)
         return log_x_z + log_z
 
     def _encoding(self, x):
