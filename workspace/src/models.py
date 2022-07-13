@@ -158,6 +158,7 @@ class ABPModel(BaseModel):
         self.config = config
 
         # langevin steps
+        self.sampler = config.MCMC_SAMPLER
         self.mcmc_steps = int(config.MCMC_STEPS)
         self.delta = float(config.DELTA)
         self.step_mul = float(config.RATIO)
@@ -301,8 +302,14 @@ class ABPModel(BaseModel):
     def wake_forward(self, x):
         with torch.no_grad():
             z_hat = self._encoding(x)
-        z = self._langevin_posterior_sampler(x, z_hat)
-        return self._decoding(z), z_hat, z
+            x_recon_hat = self._decoding(z_hat)
+
+        if self.sampler == "LD":
+            z = self._langevin_posterior_sampler(x, z_hat)
+        elif self.sampler == "HMC":
+            z = self._hmc_posterior_sampler(x, z_hat)
+            
+        return self._decoding(z), x_recon_hat, z_hat, z
 
     def update_model(self, x, x_rec, z, z_inf):
         ### calculate loss
@@ -327,12 +334,17 @@ class ABPModel(BaseModel):
         self.iteration += 1
 
         x_prior, z_prior_hat, z_prior = self.sleep_forward(x)
-        x_recon, z_hat, z = self.wake_forward(x)
+        x_recon, x_recon_hat, z_hat, z = self.wake_forward(x)
 
         l_rc, l_f = self.update_model(x, x_recon, z_prior, z_prior_hat)
+        with torch.no_grad():
+            l_rc_hat = 0.5 * F.mse_loss(
+                    x_recon_hat, x, reduction='none'
+                ).div(self.sigma ** 2).sum(dim=[1, 2, 3]).mean().item()
 
         logs = [
             ("l_rc", l_rc),
+            ("l_rc_hat", l_rc_hat),
             ("l_f", l_f)
         ]
 
