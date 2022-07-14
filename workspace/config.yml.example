@@ -20,8 +20,8 @@ PRETRAIN: 1                   # pre-train the generator (0: off, 1: on)
 PRETRAIN_EPOCH: 5             # number of epochs for pre-training             
 
 MCMC_SAMPLER: HMC             # name of the MCMC sampler ("LD": Langevin Dynamics, "HMC": Hamiltonian Monte Carlo)
-MCMC_STEPS: 60                # number of iterations for MCMC sampling
-DELTA: 0.1                    # step size for MCMC iteration
+MCMC_STEPS: 20                # number of iterations for MCMC sampling
+DELTA: 0.4                    # step size for MCMC iteration
 RATIO: 1.02                   # adjustment ratio for MCMC step size (only for HMC sampler)
 L: 3                          # number of leapfrog steps
 ACCEPT_THRESHOLD: 0.651       # number of leapfrog steps
