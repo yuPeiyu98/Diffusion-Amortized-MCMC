@@ -121,8 +121,16 @@ def run_ABP(model, config, train_dataset, val_dataset):
             )
             return
 
-        if bool(config.PRETRAIN):
+        if bool(config.PRETRAIN):            
+            progbar = Progbar(
+                total, 
+                width=20, 
+                stateful_metrics=['pre-train epoch', 'iter']
+            )
+
             for i in range(config.PRETRAIN_EPOCH):
+                print('\n\nPre-training epoch: {}'.format(i + 1))
+
                 for iteration, items in enumerate(train_loader):
                     model.train()
 
