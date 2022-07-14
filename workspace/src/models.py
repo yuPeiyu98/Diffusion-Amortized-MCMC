@@ -309,6 +309,28 @@ class ABPModel(BaseModel):
 
         return self._decoding(z), x_recon_hat, z_hat, z
 
+    def update_G(self, x):
+        ### calculate loss
+        # + reconstruction loss
+        z_prior = torch.randn(
+                    x.size(0), self.latent_dim, self.im_size, self.im_size,
+                    device=x.device
+                )
+        l_rc = 0.5 * F.mse_loss(
+                self._decoding(z_prior), x, reduction='none'
+            ).div(self.sigma ** 2).sum(dim=[1, 2, 3]).mean()
+
+        ### update weights
+        self.optimizer.zero_grad()
+        l_rc.backward()
+        self.optimizer.step()
+
+        logs = [
+            ("l_rc", l_rc.item())            
+        ]
+
+        return logs
+
     def update_model(self, x, x_rec, z, z_inf):
         ### calculate loss
         # + reconstruction loss

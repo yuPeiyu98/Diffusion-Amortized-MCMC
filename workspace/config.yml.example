@@ -16,6 +16,8 @@ BETA1': 0.5                   # adam optimizer beta1
 BETA2': 0.999                 # adam optimizer beta2
 BATCH_SIZE: 64                # input batch size for training
 MAX_ITERS: 2e6                # maximum number of iterations to train the model
+PRETRAIN: 1                   # pre-train the generator (0: off, 1: on)
+PRETRAIN_EPOCH: 5             # number of epochs for pre-training             
 
 MCMC_SAMPLER: HMC             # name of the MCMC sampler ("LD": Langevin Dynamics, "HMC": Hamiltonian Monte Carlo)
 MCMC_STEPS: 60                # number of iterations for MCMC sampling

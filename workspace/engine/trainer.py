@@ -121,6 +121,27 @@ def run_ABP(model, config, train_dataset, val_dataset):
             )
             return
 
+        if bool(config.PRETRAIN):
+            for i in range(config.PRETRAIN_EPOCH):
+                for iteration, items in enumerate(train_loader):
+                    model.train()
+
+                    img, __ = cuda(items, config.DEVICE)                
+
+                    logs = model.update_G(img)
+
+                    logs = [
+                        ("pre-train epoch", i + 1),
+                        ("iter", iteration),
+                    ] + logs
+
+                    progbar.add(len(img), values=logs)
+
+                    # log model at checkpoints
+                    if bool(config.LOG_INTERVAL) and \
+                        iteration % int(config.LOG_INTERVAL) == 0:
+                        log(logs, log_file)
+
         while(keep_training):
             epoch += 1
             print('\n\nTraining epoch: {}'.format(epoch))
