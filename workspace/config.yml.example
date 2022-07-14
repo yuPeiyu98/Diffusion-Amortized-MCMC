@@ -26,7 +26,7 @@ RATIO: 1.02                   # adjustment ratio for MCMC step size (only for HM
 L: 3                          # number of leapfrog steps
 ACCEPT_THRESHOLD: 0.651       # number of leapfrog steps
 
-SIGMA: 0.025                  # scaling factor for reconstruction loss
+SIGMA: 0.05                   # scaling factor for reconstruction loss
 F_WEIGHT: 1                   # weight for learning the inverse mapping
 
 INPUT_DIM: 3                  # input image dim for training
