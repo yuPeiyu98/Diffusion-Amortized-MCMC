@@ -17,7 +17,7 @@ def sample_langevin_prior_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, v
             z.data += e_l_step_size * torch.randn_like(z)
 
         if (i % 5 == 0 or i == e_l_steps - 1):
-            mystr += "{}/{:.3f}/{:.3f}".format(i, en.item(), z_norm.item())
+            mystr += "{}/{:.3f}/{:.3f}  ".format(i, en.item(), z_norm.item())
     if verbose:
         print("Log prior sampling.")
         print(mystr)
@@ -49,7 +49,7 @@ def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     zk_prior.requires_grad = True
     zk_prior = sample_langevin_prior_z(z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
     with torch.no_grad():
-        x = netG(x)
+        x = netG(zk_prior)
     return x
 
 def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise, real_m, real_s, save_name):

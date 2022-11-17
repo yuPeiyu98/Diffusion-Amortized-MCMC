@@ -7,13 +7,13 @@ import torch.nn.functional as F
 import torch.nn.utils.spectral_norm as sn
 import numpy as np
 import math
-from diffusion_helper_func import *
+from .diffusion_helper_func import *
 
 ########### Generator ###################
 class _netG_cifar10(nn.Module):
     def __init__(self, nz=128, ngf=128, nc=3):
         super().__init__()
-
+        self.nz = nz
         f = nn.LeakyReLU(0.2)
 
         self.gen = nn.Sequential(
@@ -28,7 +28,8 @@ class _netG_cifar10(nn.Module):
         )    
     
     def forward(self, z):
-        return self.gen(z)
+        _z = z.reshape((len(z), self.nz, 1, 1))
+        return self.gen(_z)
 
 ############ Latent EBM ##################
 class _netE(nn.Module):
@@ -53,6 +54,7 @@ class _netE(nn.Module):
 class Encoder_cifar10(nn.Module):
     def __init__(self, nc=3, nemb=128, nif=64):
         super().__init__()
+        self.nemb = nemb
         modules = nn.Sequential(
             nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
             nn.LeakyReLU(0.2, inplace=True),
@@ -67,14 +69,17 @@ class Encoder_cifar10(nn.Module):
         self.net = nn.Sequential(*modules)
 
     def forward(self, input):
-        return self.net(input)
+        return self.net(input).reshape((len(input), self.nemb))
 
 class ConcatSquashLinear(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx):
         super(ConcatSquashLinear, self).__init__()
         self._layer = nn.Linear(dim_in, dim_out)
+        self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
         self._hyper_bias = nn.Linear(dim_ctx, dim_out, bias=False)
+        self._hyper_bias.weight.data.zero_()
         self._hyper_gate = nn.Linear(dim_ctx, dim_out)
+        self._hyper_gate.weight.data.zero_()
 
     def forward(self, ctx, x):
         gate = torch.sigmoid(self._hyper_gate(ctx))
@@ -123,6 +128,7 @@ class Diffusion_net(nn.Module):
             ConcatSquashLinear(256, 128, nxemb + ntemb),
             ConcatSquashLinear(128, nz, nxemb + ntemb)
         ])
+        self.layers[-1]._layer.weight.data.zero_()
     
     def forward(self, z, logsnr, xemb):
         b = len(z)
@@ -181,6 +187,7 @@ class _netQ(nn.Module):
             logsnr_t = logsnr_t.reshape((b, 1))
             logsnr_s = logsnr_s.reshape((b, 1))
             pred_z = pred_x_from_eps(z=zt, eps=eps_pred, logsnr=logsnr_t)
+            pred_z = torch.clamp(pred_z, min=-2.5, max=2.5)
 
             if i == 0:
                 zt = pred_z
@@ -200,7 +207,7 @@ class _netQ(nn.Module):
 
         zt_dist = diffusion_forward(z, logsnr=logsnr.reshape(len(z), 1))
         eps = torch.randn_like(z)
-        zt = zt_dist['mean'] + zt_dist['eps'] * eps
+        zt = zt_dist['mean'] + zt_dist['std'] * eps
         eps_pred = self.p(z=zt, logsnr=logsnr, xemb=xemb)
         assert eps.shape == eps_pred.shape == (len(z), self.nz)
         loss = torch.mean((eps - eps_pred) ** 2, dim=1)
