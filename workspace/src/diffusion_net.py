@@ -75,11 +75,11 @@ class ConcatSquashLinear(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx):
         super(ConcatSquashLinear, self).__init__()
         self._layer = nn.Linear(dim_in, dim_out)
-        self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
+        #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
         self._hyper_bias = nn.Linear(dim_ctx, dim_out, bias=False)
-        self._hyper_bias.weight.data.zero_()
+        #self._hyper_bias.weight.data.zero_()
         self._hyper_gate = nn.Linear(dim_ctx, dim_out)
-        self._hyper_gate.weight.data.zero_()
+        #self._hyper_gate.weight.data.zero_()
 
     def forward(self, ctx, x):
         gate = torch.sigmoid(self._hyper_gate(ctx))
@@ -128,7 +128,7 @@ class Diffusion_net(nn.Module):
             ConcatSquashLinear(256, 128, nxemb + ntemb),
             ConcatSquashLinear(128, nz, nxemb + ntemb)
         ])
-        self.layers[-1]._layer.weight.data.zero_()
+        #self.layers[-1]._layer.weight.data.zero_()
     
     def forward(self, z, logsnr, xemb):
         b = len(z)
@@ -179,15 +179,18 @@ class _netQ(nn.Module):
         b = len(x)
         xemb = self.encoder(x)
         zt = torch.randn(b, self.nz).to(x.device)
+        #print('zt', zt.max(), zt.min())
         for i in reversed(range(0, self.n_interval)):
             i_tensor = torch.ones(b, dtype=torch.float).to(x.device) * float(i)
             logsnr_t = logsnr_schedule_fn(i_tensor / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
             logsnr_s = logsnr_schedule_fn(torch.clamp(i_tensor - 1.0, min=0.0) / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
             eps_pred = self.p(z=zt, logsnr=logsnr_t, xemb=xemb)
+            #print('eps', i, eps_pred.max(), eps_pred.min())
             logsnr_t = logsnr_t.reshape((b, 1))
             logsnr_s = logsnr_s.reshape((b, 1))
             pred_z = pred_x_from_eps(z=zt, eps=eps_pred, logsnr=logsnr_t)
-            pred_z = torch.clamp(pred_z, min=-2.5, max=2.5)
+            #print('pred_z', i, pred_z.max(), pred_z.min())
+            #pred_z = torch.clamp(pred_z, min=-2.5, max=2.5)
 
             if i == 0:
                 zt = pred_z

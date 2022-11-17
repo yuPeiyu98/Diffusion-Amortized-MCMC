@@ -34,6 +34,8 @@ class log1mexp(torch.autograd.Function):
 mylog1mexp = log1mexp.apply
 
 def pred_x_from_eps(z, eps, logsnr):
+    #print('coeff1', torch.sqrt(1. + torch.exp(-logsnr)).max(), torch.sqrt(1. + torch.exp(-logsnr)).min())
+    #print('coeff2', torch.rsqrt(1. + torch.exp(logsnr)).max(), torch.rsqrt(1. + torch.exp(logsnr)).min())
     return torch.sqrt(1. + torch.exp(-logsnr)) * (z - eps * torch.rsqrt(1. + torch.exp(logsnr)))
 
 def logsnr_schedule_fn(t, logsnr_min=-20, logsnr_max=20):

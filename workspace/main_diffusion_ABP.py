@@ -112,7 +112,7 @@ def main(args):
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
         zk_pos = sample_langevin_post_z(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
-            g_l_step_size=args.g_l_step_size, verbose = (iteration % args.print_iter == 0))
+            g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
 
         # update Q 
         Q_optimizer.zero_grad()
@@ -139,7 +139,7 @@ def main(args):
         zk_prior = torch.randn_like(zk_pos).detach()
         zk_prior.requires_grad = True
         zk_prior = sample_langevin_prior_z(z=zk_prior, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,\
-             verbose = (iteration % args.print_iter == 0))
+             verbose = (iteration % (args.print_iter * 10) == 0))
         en_neg = E(zk_prior).mean() 
         en_loss = en_neg - en_pos
         en_loss.backward()
@@ -167,7 +167,7 @@ def main(args):
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
-        if iteration > -1 and iteration % args.ckpt_iter == 0:
+        if iteration > 0 and iteration % args.ckpt_iter == 0:
             print('Saving checkpoint')
             save_dict = {
                 'G_state_dict': G.state_dict(),
@@ -180,7 +180,7 @@ def main(args):
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
-        if iteration > -1 and iteration % args.fid_iter == 0:
+        if iteration > 0 and iteration % args.fid_iter == 0:
             G.eval()
             E.eval()
             fid_s_time = time.time()
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_interval', type=int, default=20, help='number of diffusion steps used here')
     parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
-    parser.add_argument('--diffusion_residual', type=bool, default=False, help='whether treat prediction as residual in latent diffusion model')
+    parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
     
     # MCMC related parameters
