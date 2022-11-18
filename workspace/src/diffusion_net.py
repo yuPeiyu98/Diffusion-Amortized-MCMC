@@ -134,11 +134,14 @@ class Diffusion_net(nn.Module):
         b = len(z)
         assert z.shape == (b, self.nz)
         assert logsnr.shape == (b,)
-        assert xemb.shape == (b, self.nxemb)
+        assert (xemb is None and self.nxemb == 0) or xemb.shape == (b, self.nxemb)
         logsnr_input = (torch.arctan(torch.exp(-0.5 * torch.clamp(logsnr, min=-20., max=20.))) / (0.5 * np.pi))
         temb = self.time_mlp(logsnr_input)
         assert temb.shape == (b, self.ntemb)
-        total_emb = torch.cat([temb, xemb], dim=1)
+        if xemb is None:
+            total_emb = temb
+        else:
+            total_emb = torch.cat([temb, xemb], dim=1)
 
         out = z
         for i, layer in enumerate(self.layers):
@@ -158,14 +161,15 @@ class _netQ(nn.Module):
         nxemb=128, 
         ntemb=128, 
         nif=64, 
-        diffusion_residual=False, # set default value to false given that we pred eps
+        diffusion_residual=False,
         n_interval=20,
         logsnr_min=-20.,
         logsnr_max=20., 
-        var_type='small' # try 'large', 'small'
+        var_type='small', # try 'large', 'small'
         ):
 
         super().__init__()
+        print("Conditional model Q")
         self.n_interval = n_interval
         self.logsnr_min = logsnr_min
         self.logsnr_max = logsnr_max
@@ -213,9 +217,63 @@ class _netQ(nn.Module):
         zt = zt_dist['mean'] + zt_dist['std'] * eps
         eps_pred = self.p(z=zt, logsnr=logsnr, xemb=xemb)
         assert eps.shape == eps_pred.shape == (len(z), self.nz)
-        loss = torch.mean((eps - eps_pred) ** 2, dim=1)
+        loss = torch.sum((eps - eps_pred) ** 2, dim=1)
         return loss
 
+
+class _netQ_uncond(nn.Module):
+    def __init__(self, 
+        nc=3, 
+        nz=128, 
+        ntemb=128, 
+        diffusion_residual=False,
+        n_interval=20,
+        logsnr_min=-20.,
+        logsnr_max=20., 
+        var_type='small', # try 'large', 'small'
+        ):
+
+        super().__init__()
+        print("Unconditional prior model")
+        self.n_interval = n_interval
+        self.logsnr_min = logsnr_min
+        self.logsnr_max = logsnr_max
+        self.var_type = var_type
+        self.nz = nz
+        self.p = Diffusion_net(nz=nz, nxemb=0, ntemb=ntemb, residual=diffusion_residual) # no x embedding
+
+    def forward(self, b, device):
+        # generate prior samples
+        zt = torch.randn(b, self.nz).to(device)
+        for i in reversed(range(0, self.n_interval)):
+            i_tensor = torch.ones(b, dtype=torch.float).to(device) * float(i)
+            logsnr_t = logsnr_schedule_fn(i_tensor / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
+            logsnr_s = logsnr_schedule_fn(torch.clamp(i_tensor - 1.0, min=0.0) / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
+            eps_pred = self.p(z=zt, logsnr=logsnr_t, xemb=None)
+            logsnr_t = logsnr_t.reshape((b, 1))
+            logsnr_s = logsnr_s.reshape((b, 1))
+            pred_z = pred_x_from_eps(z=zt, eps=eps_pred, logsnr=logsnr_t)
+
+            if i == 0:
+                zt = pred_z
+            else:
+                z_s_dist = diffusion_reverse(x=pred_z, z_t=zt, logsnr_s=logsnr_s, logsnr_t=logsnr_t, pred_var_type=self.var_type)
+                eps = torch.randn_like(zt)
+                zt = z_s_dist['mean'] + z_s_dist['std'] * eps
+
+        return zt   
+        
+    def calculate_loss(self, z):
+        # given inferred z train unconditional diffusion model
+        u = torch.rand(len(z)).to(z.device)
+        logsnr = logsnr_schedule_fn(u, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
+        zt_dist = diffusion_forward(z, logsnr=logsnr.reshape(len(z), 1))
+        eps = torch.randn_like(z)
+        zt = zt_dist['mean'] + zt_dist['std'] * eps
+        eps_pred = self.p(z=zt, logsnr=logsnr, xemb=None)
+        assert eps.shape == eps_pred.shape == (len(z), self.nz)
+        loss = torch.sum((eps - eps_pred) ** 2, dim=1)
+        return loss
 
 
 
