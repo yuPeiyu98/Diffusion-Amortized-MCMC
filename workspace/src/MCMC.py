@@ -44,7 +44,6 @@ def sample_langevin_post_z(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_n
     z.requires_grad = False
     return z.detach()
 
-
 def sample_langevin_post_z_with_diffusion(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
     for i in range(g_l_steps):
@@ -89,9 +88,9 @@ def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_
         
     return fid
 
-def gen_samples_with_diffusion_prior(bs, device, netE, netG):
+def gen_samples_with_diffusion_prior(b, device, netE, netG):
     with torch.no_grad():
-        zk_prior = netE(bs=bs, device=device)
+        zk_prior = netE(b=b, device=device)
         x = netG(zk_prior)
     return x
 

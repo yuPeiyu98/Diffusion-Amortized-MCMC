@@ -238,15 +238,15 @@ if __name__ == "__main__":
     parser.add_argument('--g_llhd_sigma', type=float, default=1.0, help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
-    parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
+    parser.add_argument('--e_l_with_noise', default=False, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=1e-5, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
-    parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
-    parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
+    parser.add_argument('--print_iter', type=int, default=200, help='number of iterations between each print')
+    parser.add_argument('--plot_iter', type=int, default=2000, help='number of iterations between each plot')
     parser.add_argument('--ckpt_iter', type=int, default=50000, help='number of iterations between each ckpt saving')
     parser.add_argument('--fid_iter', type=int, default=25000, help='number of iterations between each fid computation')
 

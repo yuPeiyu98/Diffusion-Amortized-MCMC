@@ -159,7 +159,7 @@ def main(args):
             # samples
             G.eval()
             E.eval()
-            samples = gen_samples_with_diffusion_prior(bs=64, device=z0.device, netE=E, netG=G) 
+            samples = gen_samples_with_diffusion_prior(b=64, device=z0.device, netE=E, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         

@@ -217,7 +217,7 @@ class _netQ(nn.Module):
         zt = zt_dist['mean'] + zt_dist['std'] * eps
         eps_pred = self.p(z=zt, logsnr=logsnr, xemb=xemb)
         assert eps.shape == eps_pred.shape == (len(z), self.nz)
-        loss = torch.sum((eps - eps_pred) ** 2, dim=1)
+        loss = 0.5 * torch.sum((eps - eps_pred) ** 2, dim=1)
         return loss
 
 
@@ -272,7 +272,7 @@ class _netQ_uncond(nn.Module):
         zt = zt_dist['mean'] + zt_dist['std'] * eps
         eps_pred = self.p(z=zt, logsnr=logsnr, xemb=None)
         assert eps.shape == eps_pred.shape == (len(z), self.nz)
-        loss = torch.sum((eps - eps_pred) ** 2, dim=1)
+        loss = 0.5 * torch.sum((eps - eps_pred) ** 2, dim=1)
         return loss
 
 
