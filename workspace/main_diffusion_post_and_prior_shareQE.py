@@ -1,3 +1,5 @@
+# Use both diffusion model (seperate models) as prior and posterior
+
 import argparse
 import numpy as np
 import os
@@ -13,8 +15,8 @@ import pytorch_fid_wrapper as pfw
 import shutil
 import datetime as dt
 import re
-from src.diffusion_net import _netG_cifar10, _netE, _netQ
-from src.MCMC import sample_langevin_prior_z, sample_langevin_post_z, gen_samples, calculate_fid
+from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond
+from src.MCMC import sample_langevin_post_z_with_diffusion, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 #################### training #####################################
 
@@ -70,15 +72,13 @@ def main(args):
 
     # define models
     G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
-    E = _netE(nz=args.nz, ndf=args.nef, nez=args.nez, e_sn=args.e_sn)
     Q = _netQ(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
-        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval, logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise)
+        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise)
+    
     G.cuda()
-    E.cuda()
     Q.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
     start_iter = 0
@@ -87,10 +87,8 @@ def main(args):
         print('load from ', args.resume_path)
         state_dict = torch.load(args.resume_path)
         G.load_state_dict(state_dict['G_state_dict'])
-        E.load_state_dict(state_dict['E_state_dict'])
         Q.load_state_dict(state_dict['Q_state_dict'])
         G_optimizer.load_state_dict(state_dict['G_optimizer'])
-        E_optimizer.load_state_dict(state_dict['E_optimizer'])
         Q_optimizer.load_state_dict(state_dict['Q_optimizer'])
         start_iter = state_dict['iter'] + 1
     
@@ -105,19 +103,23 @@ def main(args):
 
         Q.eval()
         G.eval()
-        E.eval()
         # infer z from given x
         with torch.no_grad():
             z0 = Q(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
-        zk_pos = sample_langevin_post_z(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_diffusion(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
-
+        
         # update Q 
         Q_optimizer.zero_grad()
         Q.train()
-        Q_loss = Q.calculate_loss(x=x, z=zk_pos).mean()
+        z_mask_prob = torch.rand((len(zk_pos),)).to(zk_pos.device)
+        z_mask = torch.ones(len(zk_pos),).to(zk_pos.device)
+        z_mask[z_mask_prob < args.p_mask] = 0.0
+        z_mask = z_mask.unsqueeze(-1)
+
+        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
         Q_loss.backward()
         torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=1.0)
         Q_optimizer.step()
@@ -131,24 +133,8 @@ def main(args):
         torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=1.0)
         G_optimizer.step()
 
-        # update E
-        E_optimizer.zero_grad()
-        E.train()
-        en_pos = E(zk_pos).mean()
-        E.eval()
-        zk_prior = torch.randn_like(zk_pos).detach()
-        zk_prior.requires_grad = True
-        zk_prior = sample_langevin_prior_z(z=zk_prior, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,\
-             verbose = (iteration % (args.print_iter * 10) == 0))
-        en_neg = E(zk_prior).mean() 
-        en_loss = en_neg - en_pos
-        en_loss.backward()
-        torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=1.0)
-        E_optimizer.step()
-
         if iteration % args.print_iter == 0:
-            print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.4f} en_pos {:.2f} en_neg {:.2f} en_loss {:.3f}"\
-                .format(iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), en_pos.item(), en_neg.item(), en_loss.item()))
+            print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f}".format(iteration, time.time() - start_time, g_loss.item(), Q_loss.item()))
             print(zk_pos.max(), zk_pos.min())
         if iteration % args.plot_iter == 0:
             # reconstruction
@@ -162,8 +148,7 @@ def main(args):
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
             G.eval()
-            E.eval()
-            samples = gen_samples(bs=64, nz=args.nz, netE=E, netG=G, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise) 
+            samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netE=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -172,28 +157,22 @@ def main(args):
             save_dict = {
                 'G_state_dict': G.state_dict(),
                 'G_optimizer': G_optimizer.state_dict(),
-                'E_state_dict': E.state_dict(),
-                'E_optimizer': E_optimizer.state_dict(),
                 'Q_state_dict': Q.state_dict(),
                 'Q_optimizer': Q_optimizer.state_dict(),
                 'iter': iteration
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
-        if iteration > 0 and iteration % args.fid_iter == 0:
+        if iteration % args.fid_iter == 0:
             G.eval()
-            E.eval()
             fid_s_time = time.time()
-            out_fid = calculate_fid(n_samples=args.n_fid_samples, nz=args.nz, netE=E, netG=G, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, \
-                e_l_with_noise=args.e_l_with_noise, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
             if out_fid < fid_best:
                 fid_best = out_fid
                 print('Saving best checkpoint')
                 save_dict = {
                     'G_state_dict': G.state_dict(),
                     'G_optimizer': G_optimizer.state_dict(),
-                    'E_state_dict': E.state_dict(),
-                    'E_optimizer': E_optimizer.state_dict(),
                     'Q_state_dict': Q.state_dict(),
                     'Q_optimizer': Q_optimizer.state_dict(),
                     'iter': iteration
@@ -210,30 +189,29 @@ if __name__ == "__main__":
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     
     # data related parameters
-    parser.add_argument('--batch_size', type=int, default=100, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
-    parser.add_argument('--n_fid_samples', type=int, default=1000, help='number of samples for calculating fid during training')
+    parser.add_argument('--n_fid_samples', type=int, default=5000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
     parser.add_argument('--nz', type=int, default=128, help='z vector length')
     parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
-    parser.add_argument('--nef', type=int, default=200, help='feature dimension of latent ebm')
     parser.add_argument('--nif', type=int, default=64, help='base channel numbers in Q encoder')
-    parser.add_argument('--nez', type=int, default=1, help='final output number of ebm')
-    parser.add_argument('--e_sn', type=bool, default=False, help='whether use spectral_norm in ebm')
     parser.add_argument('--nxemb', type=int, default=128, help='x embedding dimension in Q')
     parser.add_argument('--ntemb', type=int, default=128, help='t embedding dimension in Q')
 
     # latent diffusion related parameters
-    parser.add_argument('--n_interval', type=int, default=20, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_posterior', type=int, default=20, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_prior', type=int, default=20, help='number of diffusion steps used here')
     parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=False, help='whether include noise during inference')
+    parser.add_argument('--p_mask', type=float, default=0.2, help='probability of prior model')
     
     # MCMC related parameters
-    parser.add_argument('--g_l_steps', type=int, default=20, help='number of langevin steps for posterior inference')
+    parser.add_argument('--g_l_steps', type=int, default=10, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=False, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=1.0, help='sigma for G loss')
@@ -242,12 +220,12 @@ if __name__ == "__main__":
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
+    parser.add_argument('--g_lr', type=float, default=3e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=1e-5, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
-    parser.add_argument('--print_iter', type=int, default=200, help='number of iterations between each print')
-    parser.add_argument('--plot_iter', type=int, default=2000, help='number of iterations between each plot')
+    parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
+    parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
     parser.add_argument('--ckpt_iter', type=int, default=50000, help='number of iterations between each ckpt saving')
     parser.add_argument('--fid_iter', type=int, default=25000, help='number of iterations between each fid computation')
 

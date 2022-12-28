@@ -73,7 +73,7 @@ def main(args):
     # define models
     G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
-        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type)
+        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise)
     E = _netQ_uncond(nc=args.nc, nz=args.nz, ntemb=args.ntemb, diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_prior, logsnr_min=args.logsnr_min, \
         logsnr_max=args.logsnr_max, var_type=args.var_type)
     
@@ -117,7 +117,7 @@ def main(args):
         zk_pos.requires_grad = True
         zk_pos = sample_langevin_post_z_with_diffusion(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
-
+        
         # update Q 
         Q_optimizer.zero_grad()
         Q.train()
@@ -142,7 +142,17 @@ def main(args):
         E_loss.backward()
         torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=1.0)
         E_optimizer.step()
-
+        '''
+        with torch.no_grad():
+            x_sample, zk_sample = gen_samples_with_diffusion_prior(b=64, device=z0.device, netE=E, netG=G) 
+        # update Q 
+        Q_optimizer.zero_grad()
+        Q.train()
+        Q_loss = Q.calculate_loss(x=x_sample, z=zk_sample).mean()
+        Q_loss.backward()
+        torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=1.0)
+        Q_optimizer.step()
+        '''
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f} e_loss {:.3f}".format(iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), E_loss.item()))
             print(zk_pos.max(), zk_pos.min())
@@ -157,9 +167,11 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            G.eval()
-            E.eval()
-            samples = gen_samples_with_diffusion_prior(b=64, device=z0.device, netE=E, netG=G) 
+            #G.eval()
+            #E.eval()
+            G.train()
+            E.train()
+            samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netE=E, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -176,7 +188,7 @@ def main(args):
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
-        if iteration > 0 and iteration % args.fid_iter == 0:
+        if iteration % args.fid_iter == 0:
             G.eval()
             E.eval()
             fid_s_time = time.time()
@@ -207,7 +219,7 @@ if __name__ == "__main__":
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=100, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
-    parser.add_argument('--n_fid_samples', type=int, default=1000, help='number of samples for calculating fid during training')
+    parser.add_argument('--n_fid_samples', type=int, default=5000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
     parser.add_argument('--nz', type=int, default=128, help='z vector length')
@@ -217,12 +229,13 @@ if __name__ == "__main__":
     parser.add_argument('--ntemb', type=int, default=128, help='t embedding dimension in Q')
 
     # latent diffusion related parameters
-    parser.add_argument('--n_interval_posterior', type=int, default=20, help='number of diffusion steps used here')
-    parser.add_argument('--n_interval_prior', type=int, default=20, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_posterior', type=int, default=10, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_prior', type=int, default=10, help='number of diffusion steps used here')
     parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
+    parser.add_argument('--Q_with_noise', type=bool, default=False, help='whether include noise during inference')
     
     # MCMC related parameters
     parser.add_argument('--g_l_steps', type=int, default=10, help='number of langevin steps for posterior inference')
@@ -234,7 +247,7 @@ if __name__ == "__main__":
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
+    parser.add_argument('--g_lr', type=float, default=3e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=1e-5, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')

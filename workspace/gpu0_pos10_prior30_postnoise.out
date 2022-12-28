@@ -1,0 +1,81 @@
+nohup: ignoring input
+Files already downloaded and verified
+Begin calculating real image statistics
+Files already downloaded and verified
+Finish calculating real image statistics 13.983 torch.Size([5000, 3, 32, 32]) tensor(0.) tensor(1.)
+Conditional model Q False
+Unconditional prior model
+Log posterior sampling.
+Step/cross_entropy/recons_loss: 0/1623.024/40901.016  1/1812.236/40901.094  2/1634.917/40900.797  3/1518.351/40900.867  4/1670.456/40900.953  5/2053.677/40901.016  6/1820.621/40901.617  7/1663.646/40901.863  8/1538.588/40902.008  9/1773.835/40902.164  
+Iter 0 time 15.14 g_loss 409.02 q_loss 16.185 e_loss 15.590
+tensor(1.3353, device='cuda:0') tensor(-1.3113, device='cuda:0')
+Saving best checkpoint
+Finish calculating fid time 11.563 fid 455.603 / 455.603
+Iter 100 time 121.08 g_loss 1842.83 q_loss 1828974.375 e_loss 721785536.000
+tensor(36079.2422, device='cuda:0') tensor(-38821.3906, device='cuda:0')
+Iter 200 time 216.30 g_loss 1766.26 q_loss 7463.213 e_loss 19690388.000
+tensor(5476.7485, device='cuda:0') tensor(-5745.4756, device='cuda:0')
+Iter 300 time 313.46 g_loss 1708.84 q_loss 12409.674 e_loss 30226572.000
+tensor(8871.1406, device='cuda:0') tensor(-6197.3018, device='cuda:0')
+Iter 400 time 410.23 g_loss 1760.82 q_loss 142012.109 e_loss 149543936.000
+tensor(19908.5410, device='cuda:0') tensor(-15159.9131, device='cuda:0')
+/home/yaxuan/miniconda3/envs/torch1.12/lib/python3.8/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and will be removed in 0.15, please use 'weights' instead.
+  warnings.warn(
+/home/yaxuan/miniconda3/envs/torch1.12/lib/python3.8/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and will be removed in 0.15. The current behavior is equivalent to passing `weights=None`.
+  warnings.warn(msg)
+/home/yaxuan/miniconda3/envs/torch1.12/lib/python3.8/site-packages/torch/nn/functional.py:1960: UserWarning: nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.
+  warnings.warn("nn.functional.sigmoid is deprecated. Use torch.sigmoid instead.")
+Iter 500 time 506.37 g_loss 1877.13 q_loss 169391.359 e_loss 280973632.000
+tensor(20589.3203, device='cuda:0') tensor(-15956.7051, device='cuda:0')
+Iter 600 time 601.97 g_loss 1629.22 q_loss 451555.844 e_loss 591940864.000
+tensor(28888.9258, device='cuda:0') tensor(-23191.0605, device='cuda:0')
+Iter 700 time 697.32 g_loss 1806.81 q_loss 3124755.250 e_loss 2221025024.000
+tensor(50589.0195, device='cuda:0') tensor(-43225.0742, device='cuda:0')
+Iter 800 time 792.34 g_loss 1643.61 q_loss 23927402.000 e_loss 9361905664.000
+tensor(93069.1094, device='cuda:0') tensor(-102886.4766, device='cuda:0')
+Iter 900 time 887.25 g_loss 1779.97 q_loss 564837568.000 e_loss 27647092736.000
+tensor(519662.6562, device='cuda:0') tensor(-495297.8125, device='cuda:0')
+Log posterior sampling.
+Step/cross_entropy/recons_loss: 0/12237732315136.000/156882.953  1/12051342688256.000/156882.953  2/12766072012800.000/156882.953  3/11399245856768.000/156882.953  4/13865818521600.000/156882.953  5/13782990454784.000/156882.953  6/13856554352640.000/156882.953  7/11777840513024.000/156882.953  8/14645378154496.000/156882.953  9/13978640056320.000/156882.953  
+Iter 1000 time 982.23 g_loss 1568.83 q_loss 12441251840.000 e_loss 144274784256.000
+tensor(3055394., device='cuda:0') tensor(-2855144.5000, device='cuda:0')
+Iter 1100 time 1077.36 g_loss 1760.49 q_loss 38221053952.000 e_loss 99070697472.000
+tensor(5057434.5000, device='cuda:0') tensor(-4914321.5000, device='cuda:0')
+Iter 1200 time 1172.49 g_loss 1744.96 q_loss 265919430656.000 e_loss 280532975616.000
+tensor(16027412., device='cuda:0') tensor(-15390292., device='cuda:0')
+Iter 1300 time 1267.64 g_loss 1874.98 q_loss 1531833221120.000 e_loss 815895216128.000
+tensor(31159766., device='cuda:0') tensor(-29441682., device='cuda:0')
+Iter 1400 time 1362.90 g_loss 1814.92 q_loss 1442166603776.000 e_loss 1178765885440.000
+tensor(42943080., device='cuda:0') tensor(-40058436., device='cuda:0')
+Iter 1500 time 1458.26 g_loss 1540.39 q_loss 3297466384384.000 e_loss 1411814129664.000
+tensor(52813396., device='cuda:0') tensor(-49272488., device='cuda:0')
+Iter 1600 time 1554.09 g_loss 1695.31 q_loss 6472259338240.000 e_loss 42620436873216.000
+tensor(73831160., device='cuda:0') tensor(-68832240., device='cuda:0')
+Iter 1700 time 1649.39 g_loss 1915.00 q_loss 6555513126912.000 e_loss 25136866525184.000
+tensor(83891744., device='cuda:0') tensor(-78299832., device='cuda:0')
+Iter 1800 time 1744.33 g_loss 1820.53 q_loss 7773987274752.000 e_loss 13856640335872.000
+tensor(1.2493e+08, device='cuda:0') tensor(-1.2728e+08, device='cuda:0')
+Iter 1900 time 1839.04 g_loss 1733.14 q_loss 8873405579264.000 e_loss 5541604098048.000
+tensor(1.0475e+08, device='cuda:0') tensor(-1.3621e+08, device='cuda:0')
+Log posterior sampling.
+Step/cross_entropy/recons_loss: 0/692471738662912.000/188559.047  1/636260347543552.000/188559.047  2/624852981514240.000/188559.047  3/696658190925824.000/188559.047  4/734673818877952.000/188559.047  5/688259919249408.000/188559.047  6/675523797712896.000/188559.047  7/525058309095424.000/188559.047  8/558820006821888.000/188559.047  9/677948910731264.000/188559.047  
+Iter 2000 time 1933.89 g_loss 1885.59 q_loss 10597196365824.000 e_loss 5794711470080.000
+tensor(1.0916e+08, device='cuda:0') tensor(-1.7380e+08, device='cuda:0')
+Iter 2100 time 2028.93 g_loss 1764.58 q_loss 14629677826048.000 e_loss 6206777196544.000
+tensor(1.2323e+08, device='cuda:0') tensor(-2.2480e+08, device='cuda:0')
+Iter 2200 time 2123.87 g_loss 1769.60 q_loss 18871826251776.000 e_loss 8631607623680.000
+tensor(1.8308e+08, device='cuda:0') tensor(-3.6745e+08, device='cuda:0')
+Iter 2300 time 2218.94 g_loss 1689.00 q_loss 26109091512320.000 e_loss 12452346462208.000
+tensor(1.7513e+08, device='cuda:0') tensor(-3.7478e+08, device='cuda:0')
+Iter 2400 time 2314.11 g_loss 1777.59 q_loss 26369264189440.000 e_loss 11333940543488.000
+tensor(1.5796e+08, device='cuda:0') tensor(-3.5431e+08, device='cuda:0')
+Iter 2500 time 2409.24 g_loss 1721.18 q_loss 25926377144320.000 e_loss 328395011391488.000
+tensor(2.3211e+08, device='cuda:0') tensor(-5.4606e+08, device='cuda:0')
+Iter 2600 time 2504.15 g_loss 1679.47 q_loss 41793592754176.000 e_loss 155130812956672.000
+tensor(2.3204e+08, device='cuda:0') tensor(-5.6552e+08, device='cuda:0')
+Iter 2700 time 2599.20 g_loss 1597.70 q_loss 70708549910528.000 e_loss 84723900612608.000
+tensor(2.5629e+08, device='cuda:0') tensor(-6.4720e+08, device='cuda:0')
+Iter 2800 time 2694.20 g_loss 1875.68 q_loss 46749221650432.000 e_loss 24644109205504.000
+tensor(2.2667e+08, device='cuda:0') tensor(-5.8532e+08, device='cuda:0')
+Iter 2900 time 2789.11 g_loss 1622.83 q_loss 88073614393344.000 e_loss 50299490271232.000
+tensor(3.7542e+08, device='cuda:0') tensor(-9.8148e+08, device='cuda:0')

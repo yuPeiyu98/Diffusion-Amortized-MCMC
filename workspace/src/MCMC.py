@@ -49,7 +49,7 @@ def sample_langevin_post_z_with_diffusion(z, x, netG, netE, g_l_steps, g_llhd_si
     for i in range(g_l_steps):
         x_hat = netG(z)
         g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
-        en = netE.calculate_loss(z).sum()
+        en = netE.calculate_loss(z=z).sum()
         total_en = g_log_lkhd + en
         z_grad = torch.autograd.grad(total_en, z)[0]
 
@@ -90,16 +90,16 @@ def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_
 
 def gen_samples_with_diffusion_prior(b, device, netE, netG):
     with torch.no_grad():
-        zk_prior = netE(b=b, device=device)
+        zk_prior = netE(x=None, b=b, device=device)
         x = netG(zk_prior)
-    return x
+    return x, zk_prior
 
 def calculate_fid_with_diffusion_prior(n_samples, device, netE, netG, real_m, real_s, save_name):
     bs = 500
     fid_samples = []
         
     for i in range(n_samples // bs):
-        cur_samples = gen_samples_with_diffusion_prior(bs, device, netE, netG)
+        cur_samples, _ = gen_samples_with_diffusion_prior(bs, device, netE, netG)
         fid_samples.append(cur_samples.detach().clone())
         
     fid_samples = torch.cat(fid_samples, dim=0)
