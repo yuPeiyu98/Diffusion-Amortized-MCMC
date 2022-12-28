@@ -63,6 +63,25 @@ def sample_langevin_post_z_with_diffusion(z, x, netG, netE, g_l_steps, g_llhd_si
     z.requires_grad = False
     return z.detach()
 
+def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
+    mystr = "Step/cross_entropy/recons_loss: "
+    for i in range(g_l_steps):
+        x_hat = netG(z)
+        g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
+        en = 1.0 / 2.0 * torch.sum(z**2)
+        total_en = g_log_lkhd + en
+        z_grad = torch.autograd.grad(total_en, z)[0]
+
+        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
+        if g_l_with_noise:
+            z.data += g_l_step_size * torch.randn_like(z)
+        mystr += "{}/{:.3f}/{:.3f}  ".format(i, en.item(), g_log_lkhd.item())
+    if verbose:
+        print("Log posterior sampling.")
+        print(mystr)
+    z.requires_grad = False
+    return z.detach()
+
 def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     zk_prior = torch.randn(bs, nz).cuda()
     zk_prior.requires_grad = True
