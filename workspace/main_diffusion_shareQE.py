@@ -19,6 +19,9 @@ import re
 from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond
 from src.MCMC import sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
+
+torch.multiprocessing.set_sharing_strategy('file_system')
+
 #################### training #####################################
 
 def main(args):
