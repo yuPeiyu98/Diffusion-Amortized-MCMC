@@ -3,6 +3,7 @@
 import argparse
 import numpy as np
 import os
+import os.path as osp
 import random
 import time
 import torch
@@ -37,7 +38,7 @@ def main(args):
     ckpt_dir = os.path.join(args.log_path, timestamp, 'ckpt')
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(ckpt_dir, exist_ok=True)
-    shutil.copyfile(__file__, os.path.join(args.log_path, timestamp, __file__))
+    shutil.copyfile(__file__, os.path.join(args.log_path, timestamp, osp.basename(__file__)))
 
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
