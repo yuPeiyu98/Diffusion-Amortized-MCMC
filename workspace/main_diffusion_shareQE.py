@@ -60,7 +60,7 @@ def main(args):
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
-    testloader = data.DataLoader(testset, batch_size=1, shuffle=True, num_workers=1, drop_last=True)
+    testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
     
     # pre-calculating statistics for fid calculation
     fid_data_true = []
@@ -96,6 +96,9 @@ def main(args):
         Q_optimizer.load_state_dict(state_dict['Q_optimizer'])
         start_iter = state_dict['iter'] + 1
     
+    g_lr = args.g_lr
+    q_lr = args.q_lr
+
     # begin training
     for iteration in range(start_iter, args.iterations + 1):
         try:
@@ -137,6 +140,15 @@ def main(args):
         g_loss.backward()
         torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=1.0)
         G_optimizer.step()
+
+        # learning rate schedule
+        if (iteration + 1) % 50000 == 0:
+            g_lr = max(g_lr * 0.5, 1e-5)
+            q_lr = max(q_lr * 0.5, 1e-5)
+            for G_param_group in G_optimizer.param_groups:
+                G_param_group['lr'] = g_lr
+            for Q_param_group in Q_optimizer.param_groups:
+                Q_param_group['lr'] = q_lr
 
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f}".format(iteration, time.time() - start_time, g_loss.item(), Q_loss.item()))
@@ -196,7 +208,7 @@ if __name__ == "__main__":
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
-    parser.add_argument('--n_fid_samples', type=int, default=5000, help='number of samples for calculating fid during training')
+    parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
     parser.add_argument('--nz', type=int, default=128, help='z vector length')
@@ -213,7 +225,7 @@ if __name__ == "__main__":
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=True, help='whether include noise during inference')
-    parser.add_argument('--p_mask', type=float, default=0.5, help='probability of prior model')
+    parser.add_argument('--p_mask', type=float, default=0.95, help='probability of prior model')
     
     # MCMC related parameters
     parser.add_argument('--g_l_steps', type=int, default=10, help='number of langevin steps for posterior inference')
@@ -225,9 +237,9 @@ if __name__ == "__main__":
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=3e-4, help='learning rate for generator')
-    parser.add_argument('--e_lr', type=float, default=1e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
+    parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
+    parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
+    parser.add_argument('--q_lr', type=float, default=5e-5, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
