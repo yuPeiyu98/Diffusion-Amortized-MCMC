@@ -225,7 +225,7 @@ if __name__ == "__main__":
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=True, help='whether include noise during inference')
-    parser.add_argument('--p_mask', type=float, default=0.95, help='probability of prior model')
+    parser.add_argument('--p_mask', type=float, default=0.5, help='probability of prior model')
     
     # MCMC related parameters
     parser.add_argument('--g_l_steps', type=int, default=10, help='number of langevin steps for posterior inference')
@@ -239,7 +239,7 @@ if __name__ == "__main__":
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=5e-5, help='learning rate for inference model Q')
+    parser.add_argument('--q_lr', type=float, default=5e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
