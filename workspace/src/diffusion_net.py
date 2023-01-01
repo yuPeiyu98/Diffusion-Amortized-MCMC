@@ -166,7 +166,7 @@ class _netQ(nn.Module):
         logsnr_min=-20.,
         logsnr_max=20., 
         var_type='small', # try 'large', 'small'
-        with_noise=True, 
+        with_noise=False, 
         ):
 
         super().__init__()
@@ -209,7 +209,8 @@ class _netQ(nn.Module):
             else:
                 z_s_dist = diffusion_reverse(x=pred_z, z_t=zt, logsnr_s=logsnr_s, logsnr_t=logsnr_t, pred_var_type=self.var_type)
                 eps = torch.randn_like(zt)
-                if self.with_noise or x is None:
+                # if self.with_noise or x is None:
+                if self.with_noise:
                     zt = z_s_dist['mean'] + z_s_dist['std'] * eps
                 else:
                     zt = z_s_dist['mean']
