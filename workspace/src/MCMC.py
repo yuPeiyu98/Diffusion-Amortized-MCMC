@@ -110,7 +110,7 @@ def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sig
         z.data = z.data + 0.5 * g_l_step_size * g_l_step_size * (-z_grad + zp_grad)
         if g_l_with_noise:
             z.data += g_l_step_size * torch.randn_like(z)
-        mystr += "{}/{:.3f}/{:.3f}  ".format(i, en.item(), g_log_lkhd.item())
+        mystr += "{}/{:.3f}/{:.3f}  ".format(i, zp_grad.mean().item(), g_log_lkhd.item())
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
