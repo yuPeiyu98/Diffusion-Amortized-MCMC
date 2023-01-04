@@ -77,7 +77,8 @@ def main(args):
     # define models
     G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
-        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise)
+        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
+        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w)
     
     G.cuda()
     Q.cuda()
@@ -227,6 +228,7 @@ if __name__ == "__main__":
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=False, help='whether include noise during inference')
     parser.add_argument('--p_mask', type=float, default=0.5, help='probability of prior model')
+    parser.add_argument('--cond_w', type=float, default=4, help='weight of conditional guidance')
     
     # MCMC related parameters
     parser.add_argument('--g_l_steps', type=int, default=10, help='number of langevin steps for posterior inference')

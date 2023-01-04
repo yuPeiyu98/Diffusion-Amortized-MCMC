@@ -167,6 +167,7 @@ class _netQ(nn.Module):
         logsnr_max=20., 
         var_type='small', # try 'large', 'small'
         with_noise=False, 
+        cond_w=0
         ):
 
         super().__init__()
@@ -180,6 +181,8 @@ class _netQ(nn.Module):
         self.with_noise = with_noise
         self.encoder = Encoder_cifar10(nc=nc, nemb=nxemb, nif=nif)
         self.p = Diffusion_net(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
+
+        self.cond_w = cond_w
 
     def forward(self, x=None, b=None, device=None):
         # give x infer z
@@ -197,6 +200,11 @@ class _netQ(nn.Module):
             logsnr_t = logsnr_schedule_fn(i_tensor / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
             logsnr_s = logsnr_schedule_fn(torch.clamp(i_tensor - 1.0, min=0.0) / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
             eps_pred = self.p(z=zt, logsnr=logsnr_t, xemb=xemb)
+
+            if x is not None and self.cond_w > 0:
+                eps_pred_unc = self.p(z=zt, logsnr=logsnr_t, xemb=torch.zeros(b, self.nxemb).to(device))
+                eps_pred = (1 + self.cond_w) * eps_pred - self.cond_w * eps_pred_unc
+            
             #print('eps', i, eps_pred.max(), eps_pred.min())
             logsnr_t = logsnr_t.reshape((b, 1))
             logsnr_s = logsnr_s.reshape((b, 1))
