@@ -17,7 +17,7 @@ import shutil
 import datetime as dt
 import re
 from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond
-from src.MCMC import sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
+from src.MCMC import sample_langevin_post_z_with_diffgrad, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -116,7 +116,7 @@ def main(args):
             z0 = Q(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
-        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_diffgrad(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         # update Q 
@@ -220,8 +220,8 @@ if __name__ == "__main__":
     parser.add_argument('--ntemb', type=int, default=128, help='t embedding dimension in Q')
 
     # latent diffusion related parameters
-    parser.add_argument('--n_interval_posterior', type=int, default=100, help='number of diffusion steps used here')
-    parser.add_argument('--n_interval_prior', type=int, default=100, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_posterior', type=int, default=20, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_prior', type=int, default=20, help='number of diffusion steps used here')
     parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
@@ -231,7 +231,7 @@ if __name__ == "__main__":
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
-    parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
+    parser.add_argument('--g_l_steps', type=int, default=10, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
