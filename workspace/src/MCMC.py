@@ -105,7 +105,7 @@ def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sig
         logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
         with torch.no_grad():
             eps_pred = netE.p(z=z, logsnr=logsnr_t, xemb=xemb)
-        zp_grad = - eps_pred / torch.rsqrt(1. + torch.exp(logsnr))
+        zp_grad = - eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t))
 
         z.data = z.data + 0.5 * g_l_step_size * g_l_step_size * (-z_grad + zp_grad)
         if g_l_with_noise:
