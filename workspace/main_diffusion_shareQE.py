@@ -16,7 +16,7 @@ import pytorch_fid_wrapper as pfw
 import shutil
 import datetime as dt
 import re
-from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond
+from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_diffgrad, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 
@@ -76,7 +76,7 @@ def main(args):
 
     # define models
     G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
-    Q = _netQ(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
+    Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w)
     
@@ -154,7 +154,7 @@ def main(args):
                 Q_param_group['lr'] = q_lr
 
             p_mask *= 2
-            p_mask = min(p_mask, 1.0)
+            p_mask = min(p_mask, 1)
 
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
@@ -218,7 +218,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
-    parser.add_argument('--nz', type=int, default=128, help='z vector length')
+    parser.add_argument('--nz', type=int, default=100, help='z vector length')
     parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
     parser.add_argument('--nif', type=int, default=64, help='base channel numbers in Q encoder')
     parser.add_argument('--nxemb', type=int, default=128, help='x embedding dimension in Q')
@@ -236,7 +236,7 @@ if __name__ == "__main__":
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
-    parser.add_argument('--g_l_steps', type=int, default=10, help='number of langevin steps for posterior inference')
+    parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
