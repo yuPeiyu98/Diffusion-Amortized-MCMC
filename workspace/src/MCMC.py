@@ -89,10 +89,12 @@ def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sig
     b = len(x)
     device = x.device
 
-    if x is not None:
-        xemb = netE.encoder(x)
-    else:
-        xemb = torch.zeros(b, netE.nxemb).to(device)
+    # if x is not None:
+    #     xemb = netE.encoder(x)
+    # else:
+    #     xemb = torch.zeros(b, netE.nxemb).to(device)
+
+    xemb = torch.zeros(b, netE.nxemb).to(device)
 
     for i in range(g_l_steps):
         x_hat = netG(z)
