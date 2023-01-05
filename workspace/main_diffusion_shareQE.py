@@ -100,6 +100,8 @@ def main(args):
     g_lr = args.g_lr
     q_lr = args.q_lr
 
+    p_mask = args.p_mask
+
     # begin training
     for iteration in range(start_iter, args.iterations + 1):
         try:
@@ -116,7 +118,7 @@ def main(args):
             z0 = Q(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
-        zk_pos = sample_langevin_post_z_with_diffgrad(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         # update Q 
@@ -124,7 +126,7 @@ def main(args):
         Q.train()
         z_mask_prob = torch.rand((len(zk_pos),)).to(zk_pos.device)
         z_mask = torch.ones(len(zk_pos),).to(zk_pos.device)
-        z_mask[z_mask_prob < args.p_mask] = 0.0
+        z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
 
         Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
@@ -150,6 +152,9 @@ def main(args):
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
+
+            p_mask *= 2
+            p_mask = min(p_mask, 1.0)
 
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
