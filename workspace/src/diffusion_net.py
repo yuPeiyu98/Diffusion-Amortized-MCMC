@@ -216,18 +216,6 @@ class Diffusion_Unet(nn.Module):
         else:
             total_emb = torch.cat([temb, xemb], dim=1)
 
-
-        out = z
-        for module in self.input_blocks:
-            h = module(h, emb, xf_out)
-            hs.append(h)
-        h = self.middle_block(h, emb, xf_out)
-        for module in self.output_blocks:
-            h = th.cat([h, hs.pop()], dim=1)
-            h = module(h, emb, xf_out)
-        h = h.type(x.dtype)
-        h = self.out(h)
-
         hs = []
         out = z
         for i, layer in enumerate(self.in_layers):
