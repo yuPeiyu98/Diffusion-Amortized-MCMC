@@ -222,7 +222,7 @@ class Diffusion_Unet(nn.Module):
             out = layer(ctx=total_emb, x=out)
             hs.append(out)
             out = self.act(out, negative_slope=0.01)
-        out = self.mid_layer(out)
+        out = self.mid_layer(ctx=total_emb, x=out)
         for i, layer in enumerate(self.out_layers):
             out = torch.cat([out, hs.pop()], dim=1)
             out = self.act(out, negative_slope=0.01)
