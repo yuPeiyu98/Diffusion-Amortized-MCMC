@@ -445,7 +445,7 @@ class _netQ_U(nn.Module):
 
         if net_arch == 'vanilla':
             self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
-        elif net_arch == 'A'
+        elif net_arch == 'A':
             self.p = Diffusion_UnetA(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
 
         self.cond_w = cond_w
