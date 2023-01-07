@@ -78,7 +78,8 @@ def main(args):
     G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
-        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w)
+        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
+        net_arch='A')
     
     G.cuda()
     Q.cuda()
