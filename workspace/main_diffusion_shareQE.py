@@ -79,7 +79,7 @@ def main(args):
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='vanilla')
+        net_arch='A')
     
     G.cuda()
     Q.cuda()
@@ -238,9 +238,9 @@ if __name__ == "__main__":
     
     # MCMC related parameters
     parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
-    parser.add_argument('--g_l_step_size', type=float, default=0.01, help='stepsize of posterior langevin')
+    parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
-    parser.add_argument('--g_llhd_sigma', type=float, default=0.01, help='sigma for G loss')
+    parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
+    parser.add_argument('--q_lr', type=float, default=5e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
