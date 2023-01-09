@@ -154,8 +154,8 @@ def main(args):
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
 
-            p_mask *= 2
-            p_mask = min(p_mask, 1)
+            # p_mask *= 2
+            # p_mask = min(p_mask, 1)
 
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
@@ -248,7 +248,7 @@ if __name__ == "__main__":
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
+    parser.add_argument('--q_lr', type=float, default=5e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
