@@ -416,7 +416,7 @@ class Diffusion_UnetB(nn.Module):
             out = layer_c(ctx=xemb, x=layer_t(ctx=temb, x=out)) 
             hs.append(out)
             # out = self.act(out, negative_slope=0.01)
-        for i, layer in self.mid_layers:
+        for i, layer in enumerate(self.mid_layers):
             out = layer(ctx=temb if i % 2 == 0 else xemb, x=out)
         for layer_t, layer_c in zip(self.out_layers_t, self.out_layers_c):
             out = torch.cat([out, hs.pop()], dim=1)
