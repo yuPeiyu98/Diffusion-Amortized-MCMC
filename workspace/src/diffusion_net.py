@@ -129,6 +129,31 @@ class ConcatSquashLinearSkipCtx(nn.Module):
         ret = self._layer(x) * gate + bias
         return ret + self._skip(x)
 
+class ResidualLinear(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_ctx):
+        super(ResidualLinear, self).__init__()
+        self._layer_in = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(dim_in, dim_out)
+        )
+        self._layer_ctx = nn.Sequential( 
+            nn.SiLU(),
+            nn.Linear(dim_ctx, dim_out)
+        )
+        self._layer_out = nn.Sequential( 
+            nn.SiLU(),
+            nn.Linear(dim_out, dim_out)
+        )
+        self._skip = nn.Linear(dim_in, dim_out)
+
+    def forward(self, ctx, x):
+        h = self._layer_in(x)
+
+        c = self._layer_ctx(ctx)
+
+        ret = self._layer_out(h + c)
+        return ret + self._skip(x)    
+
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim, max_time=1000.):
         super().__init__()
@@ -322,6 +347,88 @@ class Diffusion_UnetA(nn.Module):
         else:
             return out
 
+class Diffusion_UnetB(nn.Module):
+    def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False):
+        super().__init__()
+        self.act = F.leaky_relu
+        self.nz = nz
+        self.nxemb = nxemb
+        self.ntemb = ntemb 
+        self.residual = residual
+        
+        sinu_pos_emb = SinusoidalPosEmb(ntemb, max_time=1.)
+        self.time_mlp = nn.Sequential(
+            sinu_pos_emb,
+            nn.Linear(ntemb, ntemb),
+            nn.SiLU(),
+            nn.Linear(ntemb, ntemb)
+        )
+        
+        self.in_layers_t = nn.ModuleList([
+            ResidualLinear(nz, 128, ntemb), 
+            ResidualLinear(128, 256, ntemb), 
+            ResidualLinear(256, 256, ntemb) 
+        ])
+        self.in_layers_c = nn.ModuleList([
+            ResidualLinear(128, 128, nxemb), 
+            ResidualLinear(256, 256, nxemb), 
+            ResidualLinear(256, 256, nxemb)
+        ])
+
+        self.mid_layers = nn.ModuleList([
+            ResidualLinear(256, 256, ntemb), 
+            ResidualLinear(256, 256, nxemb), 
+            ResidualLinear(256, 256, ntemb)
+        ])
+
+        self.out_layers_t = nn.ModuleList([
+            ResidualLinear(512, 256, ntemb), 
+            ResidualLinear(256, 128, ntemb), 
+            ResidualLinear(256, 128, ntemb)
+        ])
+        self.out_layers_c = nn.ModuleList([
+            ResidualLinear(256, 256, nxemb), 
+            ResidualLinear(128, 128, nxemb), 
+            ResidualLinear(128, 128, nxemb)
+        ])
+
+        self.out = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(128, nz)
+        )
+
+    def forward(self, z, logsnr, xemb):
+        b = len(z)
+        assert z.shape == (b, self.nz)
+        assert logsnr.shape == (b,)
+        assert (xemb is None and self.nxemb == 0) or xemb.shape == (b, self.nxemb)
+        logsnr_input = (torch.arctan(torch.exp(-0.5 * torch.clamp(logsnr, min=-20., max=20.))) / (0.5 * np.pi))
+        temb = self.time_mlp(logsnr_input)
+        assert temb.shape == (b, self.ntemb)
+        if xemb is None:
+            total_emb = temb
+        else:
+            total_emb = torch.cat([temb, xemb], dim=1)
+
+        hs = []
+        out = z
+        for layer_t, layer_c in zip(self.in_layers_t, self.in_layers_c):
+            out = layer_c(ctx=xemb, x=layer_t(ctx=temb, x=out)) 
+            hs.append(out)
+            # out = self.act(out, negative_slope=0.01)
+        for i, layer in self.mid_layers:
+            out = layer(ctx=temb if i % 2 == 0 else xemb, x=out)
+        for layer_t, layer_c in zip(self.out_layers_t, self.out_layers_c):
+            out = torch.cat([out, hs.pop()], dim=1)
+            # out = self.act(out, negative_slope=0.01)
+            out = layer_c(ctx=xemb, x=layer_t(ctx=temb, x=out)) 
+        out = self.out(out)    
+        assert out.shape == (b, self.nz)
+        if self.residual:
+            return z + out
+        else:
+            return out
+
 class _netQ(nn.Module):
     def __init__(self, 
         nc=3, 
@@ -447,6 +554,8 @@ class _netQ_U(nn.Module):
             self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
         elif net_arch == 'A':
             self.p = Diffusion_UnetA(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
+        elif net_arch == 'B':
+            self.p = Diffusion_UnetB(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
 
         self.cond_w = cond_w
 
