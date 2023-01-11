@@ -383,7 +383,7 @@ class Diffusion_UnetB(nn.Module):
 
         self.out_layers_t = nn.ModuleList([
             ResidualLinear(512, 256, ntemb), 
-            ResidualLinear(256, 128, ntemb), 
+            ResidualLinear(512, 128, ntemb), 
             ResidualLinear(256, 128, ntemb)
         ])
         self.out_layers_c = nn.ModuleList([
