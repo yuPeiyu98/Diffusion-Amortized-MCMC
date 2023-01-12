@@ -79,7 +79,7 @@ def main(args):
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='B')
+        net_arch='A')
     
     G.cuda()
     Q.cuda()
@@ -115,8 +115,11 @@ def main(args):
         Q.eval()
         G.eval()
         # infer z from given x
-        with torch.no_grad():
-            z0 = Q(x)
+        if iteration < 10000:
+            z0 = torch.randn(x.size(0), args.nz, device=x.device)
+        else:
+            with torch.no_grad():
+                z0 = Q(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
         zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
