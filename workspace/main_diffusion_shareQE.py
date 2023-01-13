@@ -80,9 +80,16 @@ def main(args):
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A')
-    
+    Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
+        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
+        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
+        net_arch='A')
+    for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
+        target_param.data.copy_(param.data)
+
     G.cuda()
     Q.cuda()
+    Q_dummy.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
@@ -115,11 +122,8 @@ def main(args):
         Q.eval()
         G.eval()
         # infer z from given x
-        if iteration < 10000:
-            z0 = torch.randn(x.size(0), args.nz, device=x.device)
-        else:
-            with torch.no_grad():
-                z0 = Q(x)
+        with torch.no_grad():
+            z0 = Q_dummy(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
         zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
@@ -157,8 +161,11 @@ def main(args):
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
 
-            # p_mask *= 2
-            # p_mask = min(p_mask, 1)
+        if (iteration + 1) % 10 == 0:
+            # Update the frozen target models
+            for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
+                target_param.data.copy_(0.005 * param.data + (1 - 0.005) * target_param.data)
+
 
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
