@@ -129,6 +129,7 @@ class ConcatSquashLinearSkipCtx(nn.Module):
         ret = self._layer(x) * gate + bias
         return ret + self._skip(x)
 
+### (+ LEGACY) unstable
 class ConcatSquashLinearSkipCtxNorm(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx):
         super(ConcatSquashLinearSkipCtxNorm, self).__init__()
@@ -161,6 +162,46 @@ class ConcatSquashLinearSkipCtxNorm(nn.Module):
         f = self.norm(self._layer(x))
 
         ret = f * gain + bias
+        return ret + self._skip(x)
+
+class ConcatSquashLinearSkipCtxSECat(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_ctx):
+        super(ConcatSquashLinearSkipCtxSECat, self).__init__()
+        self._layer = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_in, dim_out)
+        ) 
+        self._layer_ctx = nn.Sequential( 
+            nn.LeakyReLU(),
+            nn.Linear(dim_ctx, dim_ctx),
+        )
+
+        self._hyper_out = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_out + dim_ctx, dim_out, bias=False)   
+        )
+
+        self._hyper_bias = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_out + dim_ctx, dim_out, bias=False)
+        ) 
+        self._hyper_gate = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_out + dim_ctx, dim_out // 8)
+            nn.LeakyReLU(),
+            nn.Linear(dim_out // 8, dim_out)
+        ) 
+        #self._hyper_gate.weight.data.zero_()
+        self._skip = nn.Linear(dim_in, dim_out)
+
+    def forward(self, ctx, x):
+        f = self._layer(x)
+        ctx = self._layer_ctx(ctx)
+        f_ctx = torch.cat([f, ctx], dim=1)
+
+        gain = torch.sigmoid(self._hyper_gate(f_ctx))
+        bias = self._hyper_bias(f_ctx)
+        ret = self._hyper_out(f_ctx) * gain + bias
         return ret + self._skip(x)
 
 class ResidualLinear(nn.Module):
@@ -476,23 +517,24 @@ class Diffusion_UnetC(nn.Module):
         self.time_mlp = nn.Sequential(
             sinu_pos_emb,
             nn.Linear(ntemb, ntemb),
-            nn.SiLU(),
+            # nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(ntemb, ntemb)
         )
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtxNorm(nz, 128, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxNorm(128, 256, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxNorm(256, 256, nxemb + ntemb)           
+            ConcatSquashLinearSkipCtxSECat(nz, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(128, 256, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(256, 256, nxemb + ntemb)           
         ])
         #self.layers[-1]._layer.weight.data.zero_()
 
-        self.mid_layer = ConcatSquashLinearSkipCtxNorm(256, 256, nxemb + ntemb) 
+        self.mid_layer = ConcatSquashLinearSkipCtxSECat(256, 256, nxemb + ntemb) 
     
         self.out_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtxNorm(512, 256, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxNorm(512, 128, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxNorm(256, nz, nxemb + ntemb)
+            ConcatSquashLinearSkipCtxSECat(512, 256, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(512, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(256, nz, nxemb + ntemb)
         ])
 
     def forward(self, z, logsnr, xemb):
@@ -513,11 +555,11 @@ class Diffusion_UnetC(nn.Module):
         for i, layer in enumerate(self.in_layers):
             out = layer(ctx=total_emb, x=out)
             hs.append(out)
-            out = self.act(out, negative_slope=0.01)
+            # out = self.act(out, negative_slope=0.01)
         out = self.mid_layer(ctx=total_emb, x=out)
         for i, layer in enumerate(self.out_layers):
             out = torch.cat([out, hs.pop()], dim=1)
-            out = self.act(out, negative_slope=0.01)
+            # out = self.act(out, negative_slope=0.01)
             out = layer(ctx=total_emb, x=out)
             
         assert out.shape == (b, self.nz)
