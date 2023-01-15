@@ -187,7 +187,7 @@ class ConcatSquashLinearSkipCtxSECat(nn.Module):
         ) 
         self._hyper_gate = nn.Sequential(
             nn.LeakyReLU(),
-            nn.Linear(dim_out + dim_ctx, dim_out // 8)
+            nn.Linear(dim_out + dim_ctx, dim_out // 8),
             nn.LeakyReLU(),
             nn.Linear(dim_out // 8, dim_out)
         ) 
