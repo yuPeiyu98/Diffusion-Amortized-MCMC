@@ -63,7 +63,7 @@ def main(args):
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
 
     mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
-    mloader = data.DataLoader(mset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
+    mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=1, drop_last=False)
     
     # pre-calculating statistics for fid calculation
     fid_data_true = []
@@ -227,9 +227,10 @@ def main(args):
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
             print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
-            mse_lss, N = 0.0, 0
+            mse_lss = 0.0
             mse_s_time = time.time()
 
+            i = 0
             for x, _ in mloader:
                 x = x.cuda()
                 with torch.no_grad():
@@ -245,9 +246,11 @@ def main(args):
                     x_hat = G(zk_pos)
                     g_loss = torch.sum((x_hat - x) ** 2)
                 mse_lss += g_loss.item()
-                N += 1
 
-            mse_lss /= N
+                i += 1
+                print("{}, {}".format(i, len(mset)))
+
+            mse_lss /= len(mset)
             if mse_lss < mse_best:
                 mse_best = mse_lss
             print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
