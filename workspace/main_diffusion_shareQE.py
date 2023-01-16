@@ -247,9 +247,6 @@ def main(args):
                     g_loss = torch.sum((x_hat - x) ** 2)
                 mse_lss += g_loss.item()
 
-                i += 1
-                print("{}, {}".format(i, len(mset)))
-
             mse_lss /= len(mset)
             if mse_lss < mse_best:
                 mse_best = mse_lss
