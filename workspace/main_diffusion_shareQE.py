@@ -231,6 +231,7 @@ def main(args):
             mse_s_time = time.time()
 
             for x, _ in mloader:
+                x = x.cuda()
                 with torch.no_grad():
                     z0 = Q_dummy(x)
                 zk_pos = z0.detach().clone()
