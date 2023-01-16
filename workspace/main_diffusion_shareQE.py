@@ -61,6 +61,9 @@ def main(args):
     ])
     testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
+
+    mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+    mloader = data.DataLoader(mset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
     
     # pre-calculating statistics for fid calculation
     fid_data_true = []
@@ -79,11 +82,11 @@ def main(args):
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='C')
+        net_arch='A')
     Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='C')
+        net_arch='A')
     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
         target_param.data.copy_(param.data)
 
@@ -91,11 +94,12 @@ def main(args):
     Q.cuda()
     Q_dummy.cuda()
 
-    G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
+    G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
+    Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
+    mse_best = 10000
     if args.resume_path is not None:
         print('load from ', args.resume_path)
         state_dict = torch.load(args.resume_path)
@@ -105,8 +109,8 @@ def main(args):
         Q_optimizer.load_state_dict(state_dict['Q_optimizer'])
         start_iter = state_dict['iter'] + 1
     
-    g_lr = args.g_lr
-    q_lr = args.q_lr
+    g_lr = 1e-5
+    q_lr = 1e-5
 
     p_mask = args.p_mask
 
@@ -153,13 +157,21 @@ def main(args):
         G_optimizer.step()
 
         # learning rate schedule
-        if (iteration + 1) % 50000 == 0:
-            g_lr = max(g_lr * 0.5, 1e-5)
-            q_lr = max(q_lr * 0.5, 1e-5)
-            for G_param_group in G_optimizer.param_groups:
-                G_param_group['lr'] = g_lr
-            for Q_param_group in Q_optimizer.param_groups:
-                Q_param_group['lr'] = q_lr
+        # if (iteration + 1) % 50000 == 0:
+        #     g_lr = max(g_lr * 0.5, 1e-5)
+        #     q_lr = max(q_lr * 0.5, 1e-5)
+        #     for G_param_group in G_optimizer.param_groups:
+        #         G_param_group['lr'] = g_lr
+        #     for Q_param_group in Q_optimizer.param_groups:
+        #         Q_param_group['lr'] = q_lr
+
+        g_lr = min(1e-5 + (args.g_lr - 1e-5) / (1e4) * iteration, args.g_lr)
+        q_lr = min(1e-5 + (args.q_lr - 1e-5) / (1e4) * iteration, args.q_lr)
+        for G_param_group in G_optimizer.param_groups:
+            G_param_group['lr'] = g_lr
+        for Q_param_group in Q_optimizer.param_groups:
+            Q_param_group['lr'] = q_lr
+
 
         if (iteration + 1) % 10 == 0:
             # Update the frozen target models
@@ -215,6 +227,30 @@ def main(args):
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
             print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
+            mse_lss, N = 0.0, 0
+            mse_s_time = time.time()
+
+            for x, _ in mloader:
+                with torch.no_grad():
+                    z0 = Q_dummy(x)
+                zk_pos = z0.detach().clone()
+                zk_pos.requires_grad = True
+                zk_pos = sample_langevin_post_z_with_gaussian(
+                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            g_l_step_size=args.g_l_step_size, verbose=False
+                        )
+
+                with torch.no_grad():
+                    x_hat = G(zk_pos)
+                    g_loss = torch.sum((x_hat - x) ** 2)
+                mse_lss += g_loss.item()
+                N += 1
+
+            mse_lss /= N
+            if mse_lss < mse_best:
+                mse_best = mse_lss
+            print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -256,9 +292,9 @@ if __name__ == "__main__":
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
+    parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=5e-4, help='learning rate for inference model Q')
+    parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
