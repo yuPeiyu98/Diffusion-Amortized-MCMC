@@ -94,8 +94,8 @@ def main(args):
     Q.cuda()
     Q_dummy.cuda()
 
-    G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
+    G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
+    Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -109,8 +109,8 @@ def main(args):
         Q_optimizer.load_state_dict(state_dict['Q_optimizer'])
         start_iter = state_dict['iter'] + 1
     
-    g_lr = args.g_lr
-    q_lr = args.q_lr
+    g_lr = 1e-5
+    q_lr = 1e-5
 
     p_mask = args.p_mask
 
@@ -151,28 +151,23 @@ def main(args):
         G.train()
         x_hat = G(zk_pos)
         # g_loss = 1.0 / (2.0 * args.g_llhd_sigma * args.g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        # g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        g_loss = torch.mean((x_hat - x) ** 2)
+        g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
         g_loss.backward()
         torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=1.0)
         G_optimizer.step()
 
         # learning rate schedule
-        if (iteration + 1) % 50000 == 0:
+        warm_up_stp = 1e4
+        if iteration < warm_up_stp:
+            g_lr = min(1e-5 + (args.g_lr - 1e-5) / warm_up_stp * iteration, args.g_lr)
+            q_lr = min(1e-5 + (args.q_lr - 1e-5) / warm_up_stp * iteration, args.q_lr)
+        elif (iteration + 1) % 50000 == 0:
             g_lr = max(g_lr * 0.5, 1e-5)
             q_lr = max(q_lr * 0.5, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
-
-        # g_lr = min(1e-5 + (args.g_lr - 1e-5) / (1e4) * iteration, args.g_lr)
-        # q_lr = min(1e-5 + (args.q_lr - 1e-5) / (1e4) * iteration, args.q_lr)
-        # for G_param_group in G_optimizer.param_groups:
-        #     G_param_group['lr'] = g_lr
-        # for Q_param_group in Q_optimizer.param_groups:
-        #     Q_param_group['lr'] = q_lr
-
 
         if (iteration + 1) % 10 == 0:
             # Update the frozen target models
@@ -294,9 +289,9 @@ if __name__ == "__main__":
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
+    parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=5e-4, help='learning rate for inference model Q')
+    parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
