@@ -181,7 +181,7 @@ def main(args):
 
 
         if iteration % args.print_iter == 0:
-            print("Iter {} time {:.2f} g_loss {:.2f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
+            print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
                 iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print(zk_pos.max(), zk_pos.min())
         if iteration % args.plot_iter == 0:
