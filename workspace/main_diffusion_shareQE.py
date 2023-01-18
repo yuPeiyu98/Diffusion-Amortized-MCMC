@@ -164,7 +164,7 @@ def main(args):
         # if iteration <= warm_up_stp:
         #     g_lr = min(1e-5 + (args.g_lr - 1e-5) / warm_up_stp * iteration, args.g_lr)
         #     q_lr = min(1e-5 + (args.q_lr - 1e-5) / warm_up_stp * iteration, args.q_lr)
-        elif (iteration + 1) % 1000 == 0:
+        if (iteration + 1) % 1000 == 0:
             g_lr = max(g_lr * 0.98, 1e-5)
             q_lr = max(q_lr * 0.98, 1e-5)
             for G_param_group in G_optimizer.param_groups:
