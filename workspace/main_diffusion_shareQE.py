@@ -158,12 +158,12 @@ def main(args):
 
         # learning rate schedule
         warm_up_stp = 1e4
-        if iteration < warm_up_stp:
+        if iteration <= warm_up_stp:
             g_lr = min(1e-5 + (args.g_lr - 1e-5) / warm_up_stp * iteration, args.g_lr)
             q_lr = min(1e-5 + (args.q_lr - 1e-5) / warm_up_stp * iteration, args.q_lr)
-        elif (iteration + 1) % 50000 == 0:
-            g_lr = max(g_lr * 0.5, 1e-5)
-            q_lr = max(q_lr * 0.5, 1e-5)
+        elif (iteration + 1) % 1000 == 0:
+            g_lr = max(g_lr * 0.95, 1e-5)
+            q_lr = max(q_lr * 0.95, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
@@ -282,16 +282,16 @@ if __name__ == "__main__":
     # MCMC related parameters
     parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
-    parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
+    parser.add_argument('--g_l_with_noise', default=False, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
+    parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
+    parser.add_argument('--q_lr', type=float, default=5e-4, help='learning rate for inference model Q')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
