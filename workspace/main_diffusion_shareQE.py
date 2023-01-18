@@ -146,7 +146,8 @@ def main(args):
 
         Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
         Q_loss.backward()
-        torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=1.0)
+        if args.q_is_grad_clamp:
+            torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
         Q_optimizer.step()
         
         # update G
@@ -156,7 +157,8 @@ def main(args):
         # g_loss = 1.0 / (2.0 * args.g_llhd_sigma * args.g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
         g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
         g_loss.backward()
-        torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=1.0)
+        if args.g_is_grad_clamp:
+            torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
 
         # learning rate schedule
@@ -295,6 +297,10 @@ if __name__ == "__main__":
     parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=5e-4, help='learning rate for inference model Q')
+    parser.add_argument('--q_is_grad_clamp', type=bool, default=False, help='whether doing the gradient clamp')
+    parser.add_argument('--g_is_grad_clamp', type=bool, default=False, help='whether doing the gradient clamp')
+    parser.add_argument('--q_max_norm', type=float, default=100, help='max norm allowed')
+    parser.add_argument('--g_max_norm', type=float, default=100, help='max norm allowed')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
