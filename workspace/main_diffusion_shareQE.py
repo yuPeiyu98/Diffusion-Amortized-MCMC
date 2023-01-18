@@ -282,7 +282,7 @@ if __name__ == "__main__":
     # MCMC related parameters
     parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
-    parser.add_argument('--g_l_with_noise', default=False, type=bool, help='noise term of posterior langevin')
+    parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
