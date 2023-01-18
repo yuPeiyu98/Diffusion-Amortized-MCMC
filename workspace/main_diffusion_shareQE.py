@@ -94,8 +94,11 @@ def main(args):
     Q.cuda()
     Q_dummy.cuda()
 
-    G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
-    Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
+    # G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
+    # Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
+
+    G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -109,8 +112,8 @@ def main(args):
         Q_optimizer.load_state_dict(state_dict['Q_optimizer'])
         start_iter = state_dict['iter'] + 1
     
-    g_lr = 1e-5
-    q_lr = 1e-5
+    g_lr = args.g_lr
+    q_lr = args.q_lr
 
     p_mask = args.p_mask
 
@@ -157,13 +160,13 @@ def main(args):
         G_optimizer.step()
 
         # learning rate schedule
-        warm_up_stp = 1e4
-        if iteration <= warm_up_stp:
-            g_lr = min(1e-5 + (args.g_lr - 1e-5) / warm_up_stp * iteration, args.g_lr)
-            q_lr = min(1e-5 + (args.q_lr - 1e-5) / warm_up_stp * iteration, args.q_lr)
+        # warm_up_stp = 1e4
+        # if iteration <= warm_up_stp:
+        #     g_lr = min(1e-5 + (args.g_lr - 1e-5) / warm_up_stp * iteration, args.g_lr)
+        #     q_lr = min(1e-5 + (args.q_lr - 1e-5) / warm_up_stp * iteration, args.q_lr)
         elif (iteration + 1) % 1000 == 0:
-            g_lr = max(g_lr * 0.95, 1e-5)
-            q_lr = max(q_lr * 0.95, 1e-5)
+            g_lr = max(g_lr * 0.98, 1e-5)
+            q_lr = max(q_lr * 0.98, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
