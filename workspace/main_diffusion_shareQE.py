@@ -174,7 +174,7 @@ def main(args):
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
 
-        if (iteration + 1) % 2 == 0:
+        if (iteration + 1) % 10 == 0:
             # Update the frozen target models
             for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
                 target_param.data.copy_(0.005 * param.data + (1 - 0.005) * target_param.data)
@@ -281,7 +281,7 @@ if __name__ == "__main__":
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=True, help='whether include noise during inference')
-    parser.add_argument('--p_mask', type=float, default=0.2, help='probability of prior model')
+    parser.add_argument('--p_mask', type=float, default=0.1, help='probability of prior model')
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
