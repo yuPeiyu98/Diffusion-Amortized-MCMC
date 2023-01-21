@@ -110,7 +110,7 @@ class ConcatSquashLinearSkipCtx(nn.Module):
         self._layer = nn.Linear(dim_in, dim_out)
         self._layer_ctx = nn.Sequential( 
             nn.SiLU(),
-            nn.Linear(dim_ctx, dim_ctx // 2),
+            nn.Linear(dim_ctx, dim_ctx),
             nn.SiLU()
         )
 
