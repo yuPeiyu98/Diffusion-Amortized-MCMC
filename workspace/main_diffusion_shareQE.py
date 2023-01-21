@@ -239,7 +239,7 @@ def main(args):
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_gaussian(
-                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=40, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
