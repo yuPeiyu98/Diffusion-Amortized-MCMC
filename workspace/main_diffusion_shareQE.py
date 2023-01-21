@@ -239,7 +239,7 @@ def main(args):
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_gaussian(
-                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=40, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
@@ -274,14 +274,14 @@ if __name__ == "__main__":
     parser.add_argument('--ntemb', type=int, default=128, help='t embedding dimension in Q')
 
     # latent diffusion related parameters
-    parser.add_argument('--n_interval_posterior', type=int, default=40, help='number of diffusion steps used here')
-    parser.add_argument('--n_interval_prior', type=int, default=40, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_posterior', type=int, default=100, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_prior', type=int, default=100, help='number of diffusion steps used here')
     parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=True, help='whether include noise during inference')
-    parser.add_argument('--p_mask', type=float, default=0.1, help='probability of prior model')
+    parser.add_argument('--p_mask', type=float, default=0.2, help='probability of prior model')
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
