@@ -270,12 +270,12 @@ if __name__ == "__main__":
     parser.add_argument('--nz', type=int, default=100, help='z vector length')
     parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
     parser.add_argument('--nif', type=int, default=64, help='base channel numbers in Q encoder')
-    parser.add_argument('--nxemb', type=int, default=1024, help='x embedding dimension in Q')
+    parser.add_argument('--nxemb', type=int, default=128, help='x embedding dimension in Q')
     parser.add_argument('--ntemb', type=int, default=128, help='t embedding dimension in Q')
 
     # latent diffusion related parameters
-    parser.add_argument('--n_interval_posterior', type=int, default=100, help='number of diffusion steps used here')
-    parser.add_argument('--n_interval_prior', type=int, default=100, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_posterior', type=int, default=500, help='number of diffusion steps used here')
+    parser.add_argument('--n_interval_prior', type=int, default=500, help='number of diffusion steps used here')
     parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')

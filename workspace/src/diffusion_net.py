@@ -115,9 +115,9 @@ class ConcatSquashLinearSkipCtx(nn.Module):
         )
 
         #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
-        self._hyper_bias = nn.Linear(dim_ctx // 2, dim_out, bias=False)
+        self._hyper_bias = nn.Linear(dim_ctx, dim_out, bias=False)
         #self._hyper_bias.weight.data.zero_()
-        self._hyper_gate = nn.Linear(dim_ctx // 2, dim_out)
+        self._hyper_gate = nn.Linear(dim_ctx, dim_out)
         #self._hyper_gate.weight.data.zero_()
         self._skip = nn.Linear(dim_in, dim_out)
 
