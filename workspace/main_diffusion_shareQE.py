@@ -279,7 +279,7 @@ if __name__ == "__main__":
     parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
-    parser.add_argument('--var_type', type=str, default='small', help='variance type of latent diffusion')
+    parser.add_argument('--var_type', type=str, default='large', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=True, help='whether include noise during inference')
     parser.add_argument('--p_mask', type=float, default=0.2, help='probability of prior model')
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
