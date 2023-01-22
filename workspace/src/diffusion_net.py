@@ -843,7 +843,7 @@ class _netQ_U_dual(nn.Module):
 
         return zt   
         
-    def calculate_loss(self, x=None, z=None, mask=None):
+    def calculate_loss(self, x=None, z=None):
         # given inferred x and z train diffusion model
         #assert len(x) == len(z)
         assert z is not None

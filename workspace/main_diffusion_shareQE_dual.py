@@ -140,7 +140,7 @@ def main(args):
         Q_optimizer.zero_grad()
         Q.train()
 
-        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
+        Q_loss = Q.calculate_loss(x=x, z=zk_pos).mean()
         Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
