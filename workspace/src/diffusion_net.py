@@ -849,10 +849,7 @@ class _netQ_U_dual(nn.Module):
         assert z is not None
         if x is not None: 
             xemb = self.encoder(x)
-            if mask is not None:
-                xemb = xemb * mask
         else:
-            assert mask is None
             xemb = torch.zeros(len(z), self.nxemb).to(z.device)
         u = torch.rand(len(z)).to(z.device)
         logsnr = logsnr_schedule_fn(u, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
