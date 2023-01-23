@@ -97,8 +97,11 @@ def main(args):
     # G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
     # Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
 
-    G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
+    # G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
+    # Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
+
+    G_optimizer = optim.AdamW(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.AdamW(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
