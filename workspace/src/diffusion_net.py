@@ -52,21 +52,23 @@ class _netE(nn.Module):
 
 ############# Inference model #############
 class Encoder_cifar10(nn.Module):
-    def __init__(self, nc=3, nemb=128, nif=64):
+    def __init__(self, nc=3, nemb=128, nif=64, use_norm=False):
         super().__init__()
+        self.norm = nn.BatchNorm2d if use_norm else nn.Identity
+
         self.nemb = nemb
         modules = nn.Sequential(
             nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
-            nn.BatchNorm2d(nif, affine=True),
+            self.norm(nif, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(nif, nif * 2, 4, 2, 1, bias=True),
-            nn.BatchNorm2d(nif * 2, affine=True),
+            self.norm(nif * 2, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(nif * 2, nif * 4, 4, 2, 1, bias=True),
-            nn.BatchNorm2d(nif * 4, affine=True),
+            self.norm(nif * 4, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
-            nn.BatchNorm2d(nif * 8, affine=True),
+            self.norm(nif * 8, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             nn.Conv2d(nif * 8, nemb, 4, 1, 0),
         )
