@@ -111,19 +111,28 @@ class ConcatSquashLinearSkip(nn.Module):
         return ret + self._skip(x)
 
 class ConcatSquashLinearSkipCtx(nn.Module):
-    def __init__(self, dim_in, dim_out, dim_ctx):
+    def __init__(self, dim_in, dim_out, dim_ctx, use_norm=True):
         super(ConcatSquashLinearSkipCtx, self).__init__()
-        self._layer = nn.Linear(dim_in, dim_out)
+        self.norm = nn.BatchNorm1d if use_norm else nn.Identity
+
+        self._layer = nn.Sequential(
+            nn.Linear(dim_in, dim_out),
+            self.norm(dim_out, affine=True)
+        )
         self._layer_ctx = nn.Sequential( 
             nn.SiLU(),
             nn.Linear(dim_ctx, dim_ctx // 2),
+            self.norm(dim_ctx // 2, affine=True),
             nn.SiLU()
         )
 
         #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
         self._hyper_bias = nn.Linear(dim_ctx // 2, dim_out, bias=False)
         #self._hyper_bias.weight.data.zero_()
-        self._hyper_gate = nn.Linear(dim_ctx // 2, dim_out)
+        self._hyper_gate = nn.Sequential(
+            nn.Linear(dim_ctx // 2, dim_out),
+            self.norm(dim_out, affine=True)
+        )
         #self._hyper_gate.weight.data.zero_()
         self._skip = nn.Linear(dim_in, dim_out)
 
