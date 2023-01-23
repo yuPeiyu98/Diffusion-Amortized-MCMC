@@ -100,7 +100,7 @@ def main(args):
     # G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     # Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
-    G_optimizer = optim.AdamW(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
+    G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.AdamW(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
     start_iter = 0
@@ -164,6 +164,8 @@ def main(args):
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
 
+        Q.eval()
+        G.eval()
         # learning rate schedule
         # warm_up_stp = 1e4
         # if iteration <= warm_up_stp:
@@ -198,7 +200,6 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            G.eval()
             samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netE=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
@@ -215,7 +216,6 @@ def main(args):
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
         if iteration % args.fid_iter == 0:
-            G.eval()
             fid_s_time = time.time()
             out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
             if out_fid < fid_best:
