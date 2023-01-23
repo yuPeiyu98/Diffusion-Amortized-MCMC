@@ -395,6 +395,8 @@ class Diffusion_UnetA(nn.Module):
             ConcatSquashLinearSkipCtx(256, nz, nxemb + ntemb)
         ])
 
+        self.out = nn.Linear(nz, nz)
+
     def forward(self, z, logsnr, xemb):
         b = len(z)
         assert z.shape == (b, self.nz)
@@ -420,11 +422,12 @@ class Diffusion_UnetA(nn.Module):
             out = self.act(out, negative_slope=0.01)
             out = layer(ctx=total_emb, x=out)
             
+        out = self.act(out, negative_slope=0.01)
         assert out.shape == (b, self.nz)
         if self.residual:
-            return z + out
+            return self.out(z + out)
         else:
-            return out
+            return self.out(out)
 
 class Diffusion_UnetB(nn.Module):
     def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False):
