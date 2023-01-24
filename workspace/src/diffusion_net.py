@@ -406,8 +406,6 @@ class Diffusion_UnetA(nn.Module):
             ConcatSquashLinearSkipCtx(256, nz, nxemb + ntemb)
         ])
 
-        self.out = nn.Linear(nz, nz)
-
     def forward(self, z, logsnr, xemb):
         b = len(z)
         assert z.shape == (b, self.nz)
