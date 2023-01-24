@@ -52,9 +52,9 @@ class _netE(nn.Module):
 
 ############# Inference model #############
 class Encoder_cifar10(nn.Module):
-    def __init__(self, nc=3, nemb=128, nif=64, use_norm=False):
+    def __init__(self, nc=3, nemb=128, nif=64, use_norm=True):
         super().__init__()
-        self.norm = nn.BatchNorm2d if use_norm else nn.Identity
+        self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
 
         self.nemb = nemb
         modules = nn.Sequential(
@@ -111,28 +111,20 @@ class ConcatSquashLinearSkip(nn.Module):
         return ret + self._skip(x)
 
 class ConcatSquashLinearSkipCtx(nn.Module):
-    def __init__(self, dim_in, dim_out, dim_ctx, use_norm=True):
+    def __init__(self, dim_in, dim_out, dim_ctx):
         super(ConcatSquashLinearSkipCtx, self).__init__()
-        self.norm = nn.BatchNorm1d if use_norm else nn.Identity
 
-        self._layer = nn.Sequential(
-            nn.Linear(dim_in, dim_out),
-            self.norm(dim_out, affine=True)
-        )
+        self._layer = nn.Linear(dim_in, dim_out)
         self._layer_ctx = nn.Sequential( 
             nn.SiLU(),
             nn.Linear(dim_ctx, dim_ctx // 2),
-            self.norm(dim_ctx // 2, affine=True),
             nn.SiLU()
         )
 
         #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
         self._hyper_bias = nn.Linear(dim_ctx // 2, dim_out, bias=False)
         #self._hyper_bias.weight.data.zero_()
-        self._hyper_gate = nn.Sequential(
-            nn.Linear(dim_ctx // 2, dim_out),
-            self.norm(dim_out, affine=True)
-        )
+        self._hyper_gate = nn.Linear(dim_ctx // 2, dim_out)
         #self._hyper_gate.weight.data.zero_()
         self._skip = nn.Linear(dim_in, dim_out)
 
