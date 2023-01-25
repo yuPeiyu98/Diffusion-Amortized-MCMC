@@ -136,79 +136,105 @@ class ConcatSquashLinearSkipCtx(nn.Module):
         ret = self._layer(x) * gate + bias
         return ret + self._skip(x)
 
-class QKVAttention(nn.Module):
-    """
-    A module which performs QKV attention. Matches legacy QKVAttention + input/ouput heads shaping
-    """
-
-    def __init__(self, n_heads=1):
-        super().__init__()
-        self.n_heads = n_heads
-
-    def forward(self, qkv, encoder_kv=None):
-        """
-        Apply QKV attention.
-        :param qkv: an [N x (H * 3 * C) x T] tensor of Qs, Ks, and Vs.
-        :return: an [N x (H * C) x T] tensor after attention.
-        """
-        bs, width, length = qkv.shape
-        assert width % (3 * self.n_heads) == 0
-        ch = width // (3 * self.n_heads)
-        q, k, v = qkv.reshape(bs * self.n_heads, ch * 3, length).split(ch, dim=1)
-        if encoder_kv is not None:
-            assert encoder_kv.shape[1] == self.n_heads * ch * 2
-            ek, ev = encoder_kv.reshape(bs * self.n_heads, ch * 2, -1).split(ch, dim=1)
-            k = th.cat([ek, k], dim=-1)
-            v = th.cat([ev, v], dim=-1)
-        scale = 1 / math.sqrt(math.sqrt(ch))
-        weight = th.einsum(
-            "bct,bcs->bts", q * scale, k * scale
-        )  # More stable with f16 than dividing afterwards
-        weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum("bts,bcs->bct", weight, v)
-        return a.reshape(bs, -1, length)
-
-class ConcatSquashLinearSkipCtxAttn(nn.Module):
+### (+ LEGACY) unstable
+class ConcatSquashLinearSkipCtxNorm(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx):
-        super(ConcatSquashLinearSkipCtxAttn, self).__init__()
-        self.dim_out = dim_out
-
-        self._layer_in = nn.Sequential(
-            nn.Linear(dim_in, dim_out),
-            nn.LeakyReLU()
-        )
+        super(ConcatSquashLinearSkipCtxNorm, self).__init__()
+        self._layer = nn.Linear(dim_in, dim_out, bias=False)
         self._layer_ctx = nn.Sequential( 
             nn.SiLU(),
-            nn.Linear(dim_ctx, dim_out),
+            nn.Linear(dim_ctx, dim_ctx),
             nn.SiLU()
         )
-        
-        self.x_lift = nn.Conv1d(1, 128 * 3, 1)
-        self.c_lift = nn.Conv1d(1, 128 * 2, 1)
-        self.attention = QKVAttention(n_heads=1)
-        self.xc_sqz = nn.Conv1d(128, 1, 1)
-        self.out = nn.Linear(dim_out * 2, dim_out)
 
+        #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
+        self._hyper_bias = nn.Linear(dim_ctx, dim_out, bias=False)
+        #self._hyper_bias.weight.data.zero_()
+        self._hyper_gate = nn.Linear(dim_ctx, dim_out)
+        #self._hyper_gate.weight.data.zero_()
+        self._skip = nn.Linear(dim_in, dim_out)
+
+    def norm(self, x):
+        eps = 1e-5
+        mean = torch.mean(x, dim=-1, keepdim=True).detach()
+        var = torch.var(x, dim=-1, keepdim=True, unbiased=False).detach()
+        return (x - mean) / torch.sqrt(var + eps)
+
+    def forward(self, ctx, x):
+        ctx = self._layer_ctx(ctx)
+
+        gain = self._hyper_gate(ctx)
+        bias = self._hyper_bias(ctx)
+
+        f = self.norm(self._layer(x))
+
+        ret = f * gain + bias
+        return ret + self._skip(x)
+
+class ConcatSquashLinearSkipCtxSECat(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_ctx):
+        super(ConcatSquashLinearSkipCtxSECat, self).__init__()
+        self._layer = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_in, dim_out)
+        ) 
+        self._layer_ctx = nn.Sequential( 
+            nn.LeakyReLU(),
+            nn.Linear(dim_ctx, dim_ctx),
+        )
+
+        self._hyper_out = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_out + dim_ctx, dim_out, bias=False)   
+        )
+
+        self._hyper_bias = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_out + dim_ctx, dim_out, bias=False)
+        ) 
+        self._hyper_gate = nn.Sequential(
+            nn.LeakyReLU(),
+            nn.Linear(dim_out + dim_ctx, dim_out // 8),
+            nn.LeakyReLU(),
+            nn.Linear(dim_out // 8, dim_out)
+        ) 
+        #self._hyper_gate.weight.data.zero_()
         self._skip = nn.Linear(dim_in, dim_out)
 
     def forward(self, ctx, x):
-        b = x.size(0)
+        f = self._layer(x)
+        ctx = self._layer_ctx(ctx)
+        f_ctx = torch.cat([f, ctx], dim=1)
 
-        x_l = self._layer_in(x)
-        ctx_l = self._layer_ctx(ctx)
-
-        # extend dim.
-        x_l = x_l.reshape(b, 1, self.dim_out)
-        ctx_l = ctx_l.reshape(b, 1, self.dim_out)
-
-        # attn.
-        qkv = self.x_lift(x_l)
-        encoder_out = self.c_lift(ctx_l)
-        h = self.attention(qkv, encoder_out)
-
-        ret = self.out(self.xc_sqz(h).squeeze(1))
-
+        gain = torch.sigmoid(self._hyper_gate(f_ctx))
+        bias = self._hyper_bias(f_ctx)
+        ret = self._hyper_out(f_ctx) * gain + bias
         return ret + self._skip(x)
+
+class ResidualLinear(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_ctx):
+        super(ResidualLinear, self).__init__()
+        self._layer_in = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(dim_in, dim_out)
+        )
+        self._layer_ctx = nn.Sequential( 
+            nn.SiLU(),
+            nn.Linear(dim_ctx, dim_out)
+        )
+        self._layer_out = nn.Sequential( 
+            nn.SiLU(),
+            nn.Linear(dim_out, dim_out)
+        )
+        self._skip = nn.Linear(dim_in, dim_out)
+
+    def forward(self, ctx, x):
+        h = self._layer_in(x)
+
+        c = self._layer_ctx(ctx)
+
+        ret = self._layer_out(h + c)
+        return ret + self._skip(x)    
 
 class SinusoidalPosEmb(nn.Module):
     def __init__(self, dim, max_time=1000.):
@@ -358,18 +384,18 @@ class Diffusion_UnetA(nn.Module):
         )
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtxAttn(nz, 128, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxAttn(128, 256, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxAttn(256, 256, nxemb + ntemb)           
+            ConcatSquashLinearSkipCtx(nz, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtx(128, 256, nxemb + ntemb),
+            ConcatSquashLinearSkipCtx(256, 256, nxemb + ntemb)           
         ])
         #self.layers[-1]._layer.weight.data.zero_()
 
-        self.mid_layer = ConcatSquashLinearSkipCtxAttn(256, 256, nxemb + ntemb) 
+        self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb + ntemb) 
     
         self.out_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtxAttn(512, 256, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxAttn(512, 128, nxemb + ntemb),
-            ConcatSquashLinearSkipCtxAttn(256, nz, nxemb + ntemb)
+            ConcatSquashLinearSkipCtx(512, 256, nxemb + ntemb),
+            ConcatSquashLinearSkipCtx(512, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtx(256, nz, nxemb + ntemb)
         ])
 
     def forward(self, z, logsnr, xemb):
@@ -395,6 +421,152 @@ class Diffusion_UnetA(nn.Module):
         for i, layer in enumerate(self.out_layers):
             out = torch.cat([out, hs.pop()], dim=1)
             out = self.act(out, negative_slope=0.01)
+            out = layer(ctx=total_emb, x=out)
+            
+        assert out.shape == (b, self.nz)
+        if self.residual:
+            return z + out
+        else:
+            return out
+
+class Diffusion_UnetB(nn.Module):
+    def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False):
+        super().__init__()
+        self.act = F.leaky_relu
+        self.nz = nz
+        self.nxemb = nxemb
+        self.ntemb = ntemb 
+        self.residual = residual
+        
+        sinu_pos_emb = SinusoidalPosEmb(ntemb, max_time=1.)
+        self.time_mlp = nn.Sequential(
+            sinu_pos_emb,
+            nn.Linear(ntemb, ntemb),
+            nn.SiLU(),
+            nn.Linear(ntemb, ntemb)
+        )
+        
+        self.in_layers_t = nn.ModuleList([
+            ResidualLinear(nz, 128, ntemb), 
+            ResidualLinear(128, 256, ntemb), 
+            ResidualLinear(256, 256, ntemb) 
+        ])
+        self.in_layers_c = nn.ModuleList([
+            ResidualLinear(128, 128, nxemb), 
+            ResidualLinear(256, 256, nxemb), 
+            ResidualLinear(256, 256, nxemb)
+        ])
+
+        self.mid_layers = nn.ModuleList([
+            ResidualLinear(256, 256, ntemb), 
+            ResidualLinear(256, 256, nxemb), 
+            ResidualLinear(256, 256, ntemb)
+        ])
+
+        self.out_layers_t = nn.ModuleList([
+            ResidualLinear(512, 256, ntemb), 
+            ResidualLinear(512, 128, ntemb), 
+            ResidualLinear(256, 128, ntemb)
+        ])
+        self.out_layers_c = nn.ModuleList([
+            ResidualLinear(256, 256, nxemb), 
+            ResidualLinear(128, 128, nxemb), 
+            ResidualLinear(128, 128, nxemb)
+        ])
+
+        self.out = nn.Sequential(
+            nn.SiLU(),
+            nn.Linear(128, nz)
+        )
+
+    def forward(self, z, logsnr, xemb):
+        b = len(z)
+        assert z.shape == (b, self.nz)
+        assert logsnr.shape == (b,)
+        assert (xemb is None and self.nxemb == 0) or xemb.shape == (b, self.nxemb)
+        logsnr_input = (torch.arctan(torch.exp(-0.5 * torch.clamp(logsnr, min=-20., max=20.))) / (0.5 * np.pi))
+        temb = self.time_mlp(logsnr_input)
+        assert temb.shape == (b, self.ntemb)
+        if xemb is None:
+            total_emb = temb
+        else:
+            total_emb = torch.cat([temb, xemb], dim=1)
+
+        hs = []
+        out = z
+        for layer_t, layer_c in zip(self.in_layers_t, self.in_layers_c):
+            out = layer_c(ctx=xemb, x=layer_t(ctx=temb, x=out)) 
+            hs.append(out)
+            # out = self.act(out, negative_slope=0.01)
+        for i, layer in enumerate(self.mid_layers):
+            out = layer(ctx=temb if i % 2 == 0 else xemb, x=out)
+        for layer_t, layer_c in zip(self.out_layers_t, self.out_layers_c):
+            out = torch.cat([out, hs.pop()], dim=1)
+            # out = self.act(out, negative_slope=0.01)
+            out = layer_c(ctx=xemb, x=layer_t(ctx=temb, x=out)) 
+        out = self.out(out)    
+        assert out.shape == (b, self.nz)
+        if self.residual:
+            return z + out
+        else:
+            return out
+
+class Diffusion_UnetC(nn.Module):
+    def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False):
+        super().__init__()
+        self.act = F.leaky_relu
+        self.nz = nz
+        self.nxemb = nxemb
+        self.ntemb = ntemb 
+        self.residual = residual
+        
+        sinu_pos_emb = SinusoidalPosEmb(ntemb, max_time=1.)
+        self.time_mlp = nn.Sequential(
+            sinu_pos_emb,
+            nn.Linear(ntemb, ntemb),
+            # nn.SiLU(),
+            nn.LeakyReLU(),
+            nn.Linear(ntemb, ntemb)
+        )
+        
+        self.in_layers = nn.ModuleList([
+            ConcatSquashLinearSkipCtxSECat(nz, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(128, 256, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(256, 256, nxemb + ntemb)           
+        ])
+        #self.layers[-1]._layer.weight.data.zero_()
+
+        self.mid_layer = ConcatSquashLinearSkipCtxSECat(256, 256, nxemb + ntemb) 
+    
+        self.out_layers = nn.ModuleList([
+            ConcatSquashLinearSkipCtxSECat(512, 256, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(512, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtxSECat(256, nz, nxemb + ntemb)
+        ])
+
+    def forward(self, z, logsnr, xemb):
+        b = len(z)
+        assert z.shape == (b, self.nz)
+        assert logsnr.shape == (b,)
+        assert (xemb is None and self.nxemb == 0) or xemb.shape == (b, self.nxemb)
+        logsnr_input = (torch.arctan(torch.exp(-0.5 * torch.clamp(logsnr, min=-20., max=20.))) / (0.5 * np.pi))
+        temb = self.time_mlp(logsnr_input)
+        assert temb.shape == (b, self.ntemb)
+        if xemb is None:
+            total_emb = temb
+        else:
+            total_emb = torch.cat([temb, xemb], dim=1)
+
+        hs = []
+        out = z
+        for i, layer in enumerate(self.in_layers):
+            out = layer(ctx=total_emb, x=out)
+            hs.append(out)
+            # out = self.act(out, negative_slope=0.01)
+        out = self.mid_layer(ctx=total_emb, x=out)
+        for i, layer in enumerate(self.out_layers):
+            out = torch.cat([out, hs.pop()], dim=1)
+            # out = self.act(out, negative_slope=0.01)
             out = layer(ctx=total_emb, x=out)
             
         assert out.shape == (b, self.nz)
