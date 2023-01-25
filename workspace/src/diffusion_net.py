@@ -158,14 +158,14 @@ class QKVAttention(nn.Module):
         if encoder_kv is not None:
             assert encoder_kv.shape[1] == self.n_heads * ch * 2
             ek, ev = encoder_kv.reshape(bs * self.n_heads, ch * 2, -1).split(ch, dim=1)
-            k = th.cat([ek, k], dim=-1)
-            v = th.cat([ev, v], dim=-1)
+            k = torch.cat([ek, k], dim=-1)
+            v = torch.cat([ev, v], dim=-1)
         scale = 1 / math.sqrt(math.sqrt(ch))
-        weight = th.einsum(
+        weight = torch.einsum(
             "bct,bcs->bts", q * scale, k * scale
         )  # More stable with f16 than dividing afterwards
-        weight = th.softmax(weight.float(), dim=-1).type(weight.dtype)
-        a = th.einsum("bts,bcs->bct", weight, v)
+        weight = torch.softmax(weight.float(), dim=-1).type(weight.dtype)
+        a = torch.einsum("bts,bcs->bct", weight, v)
         return a.reshape(bs, -1, length)
 
 class ConcatSquashLinearSkipCtxAttn(nn.Module):
