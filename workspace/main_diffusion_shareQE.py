@@ -211,6 +211,7 @@ def main(args):
                 'G_optimizer': G_optimizer.state_dict(),
                 'Q_state_dict': Q.state_dict(),
                 'Q_optimizer': Q_optimizer.state_dict(),
+                'Q_dummy_state_dict': Q_dummy.state_dict(),
                 'iter': iteration
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
@@ -226,6 +227,7 @@ def main(args):
                     'G_optimizer': G_optimizer.state_dict(),
                     'Q_state_dict': Q.state_dict(),
                     'Q_optimizer': Q_optimizer.state_dict(),
+                    'Q_dummy_state_dict': Q_dummy.state_dict(),
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
