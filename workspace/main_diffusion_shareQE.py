@@ -217,7 +217,7 @@ def main(args):
         
         if iteration % args.fid_iter == 0:
             fid_s_time = time.time()
-            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q_dummy, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
             if out_fid < fid_best:
                 fid_best = out_fid
                 print('Saving best checkpoint')
