@@ -187,7 +187,7 @@ class ConcatSquashLinearSkipCtxAttn(nn.Module):
         self.c_lift = nn.Conv1d(1, 128 * 2, 1)
         self.attention = QKVAttention(n_heads=1)
         self.xc_sqz = nn.Conv1d(128, 1, 1)
-        self.out = nn.Linear(dim_out * 2, dim_out)
+        self.out = nn.Linear(dim_out, dim_out)
 
         self._skip = nn.Linear(dim_in, dim_out)
 
