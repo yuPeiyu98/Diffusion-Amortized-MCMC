@@ -79,6 +79,7 @@ def main(args):
 
     # define models
     G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    G_dummy = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
@@ -89,10 +90,13 @@ def main(args):
         net_arch='A')
     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
         target_param.data.copy_(param.data)
+    for param, target_param in zip(G.parameters(), G_dummy.parameters()):
+        target_param.data.copy_(param.data)
 
     G.cuda()
     Q.cuda()
     Q_dummy.cuda()
+    G_dummy.cuda()
 
     # G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
     # Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
@@ -136,7 +140,7 @@ def main(args):
             z0 = Q_dummy(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
-        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G_dummy, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         # update Q 
@@ -183,6 +187,8 @@ def main(args):
             # Update the frozen target models
             for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
                 target_param.data.copy_(0.005 * param.data + (1 - 0.005) * target_param.data)
+            for param, target_param in zip(G.parameters(), G_dummy.parameters()):
+                target_param.data.copy_(0.005 * param.data + (1 - 0.005) * target_param.data)
 
 
         if iteration % args.print_iter == 0:
@@ -218,7 +224,7 @@ def main(args):
         
         if iteration % args.fid_iter == 0:
             fid_s_time = time.time()
-            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q_dummy, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
             if out_fid < fid_best:
                 fid_best = out_fid
                 print('Saving best checkpoint')
