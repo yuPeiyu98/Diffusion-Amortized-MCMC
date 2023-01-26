@@ -16,7 +16,7 @@ def spectral_norm(module, mode=True):
 
 ########### Generator ###################
 class _netG_cifar10(nn.Module):
-    def __init__(self, nz=128, ngf=128, nc=3, use_spc_norm=True):
+    def __init__(self, nz=128, ngf=128, nc=3, use_spc_norm=False):
         super().__init__()
         self.nz = nz
         f = nn.LeakyReLU(0.2)

@@ -79,7 +79,6 @@ def main(args):
 
     # define models
     G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
-    G_dummy = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
@@ -90,13 +89,10 @@ def main(args):
         net_arch='A')
     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
         target_param.data.copy_(param.data)
-    for param, target_param in zip(G.parameters(), G_dummy.parameters()):
-        target_param.data.copy_(param.data)
 
     G.cuda()
     Q.cuda()
     Q_dummy.cuda()
-    G_dummy.cuda()
 
     # G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
     # Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
@@ -163,18 +159,16 @@ def main(args):
         x_hat = G(zk_pos)
         # g_loss = 1.0 / (2.0 * args.g_llhd_sigma * args.g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
         g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        g_loss.backward()
-        if args.g_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
-        G_optimizer.step()
+
+        if (iteration + 1) % 5 == 0:
+            g_loss.backward()
+            if args.g_is_grad_clamp:
+                torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
+            G_optimizer.step()
 
         Q.eval()
         G.eval()
         # learning rate schedule
-        # warm_up_stp = 1e4
-        # if iteration <= warm_up_stp:
-        #     g_lr = min(1e-5 + (args.g_lr - 1e-5) / warm_up_stp * iteration, args.g_lr)
-        #     q_lr = min(1e-5 + (args.q_lr - 1e-5) / warm_up_stp * iteration, args.q_lr)
         if (iteration + 1) % 1000 == 0:
             g_lr = max(g_lr * 0.99, 1e-5)
             q_lr = max(q_lr * 0.99, 1e-5)
@@ -185,11 +179,7 @@ def main(args):
 
         if (iteration + 1) % 10 == 0:
             # Update the frozen target models
-            rho = min(1, rho)
-
             for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-            for param, target_param in zip(G.parameters(), G_dummy.parameters()):
                 target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
 
 
