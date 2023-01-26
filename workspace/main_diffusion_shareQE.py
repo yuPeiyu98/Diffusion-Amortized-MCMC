@@ -137,10 +137,10 @@ def main(args):
         G.eval()
         # infer z from given x
         with torch.no_grad():
-            z0 = Q(x)
+            z0 = Q_dummy(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
-        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G_dummy, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         # update Q 
@@ -248,7 +248,7 @@ def main(args):
             for x, _ in mloader:
                 x = x.cuda()
                 with torch.no_grad():
-                    z0 = Q(x)
+                    z0 = Q_dummy(x)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_gaussian(

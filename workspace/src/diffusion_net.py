@@ -9,21 +9,38 @@ import numpy as np
 import math
 from .diffusion_helper_func import *
 
+def spectral_norm(module, mode=True):
+    if mode:
+        return nn.utils.spectral_norm(module)
+    return module
+
 ########### Generator ###################
 class _netG_cifar10(nn.Module):
-    def __init__(self, nz=128, ngf=128, nc=3):
+    def __init__(self, nz=128, ngf=128, nc=3, use_spc_norm=True):
         super().__init__()
         self.nz = nz
         f = nn.LeakyReLU(0.2)
 
         self.gen = nn.Sequential(
-            nn.ConvTranspose2d(nz, ngf*8, 8, 1, 0, bias = True),
+            spectral_norm(
+                nn.ConvTranspose2d(nz, ngf*8, 8, 1, 0, bias = True),
+                use_spc_norm
+            ),
             f,
-            nn.ConvTranspose2d(ngf*8, ngf*4, 4, 2, 1, bias = True),
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*8, ngf*4, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
             f,
-            nn.ConvTranspose2d(ngf*4, ngf*2, 4, 2, 1, bias = True),
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*4, ngf*2, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
             f,
-            nn.ConvTranspose2d(ngf*2, nc, 3, 1, 1),
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*2, nc, 3, 1, 1),
+                use_spc_norm
+            ),
             nn.Tanh()
         )    
     
