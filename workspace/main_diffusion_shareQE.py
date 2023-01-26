@@ -121,7 +121,7 @@ def main(args):
     
     g_lr = args.g_lr
     q_lr = args.q_lr
-
+    rho = 0.005
     p_mask = args.p_mask
 
     # begin training
@@ -137,10 +137,10 @@ def main(args):
         G.eval()
         # infer z from given x
         with torch.no_grad():
-            z0 = Q_dummy(x)
+            z0 = Q(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
-        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G_dummy, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         # update Q 
@@ -185,10 +185,12 @@ def main(args):
 
         if (iteration + 1) % 10 == 0:
             # Update the frozen target models
+            rho = min(1, rho)
+
             for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-                target_param.data.copy_(0.005 * param.data + (1 - 0.005) * target_param.data)
+                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
             for param, target_param in zip(G.parameters(), G_dummy.parameters()):
-                target_param.data.copy_(0.005 * param.data + (1 - 0.005) * target_param.data)
+                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
 
 
         if iteration % args.print_iter == 0:
