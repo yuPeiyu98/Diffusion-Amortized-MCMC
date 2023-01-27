@@ -296,9 +296,9 @@ if __name__ == "__main__":
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=5e-4, help='learning rate for generator')
+    parser.add_argument('--g_lr', type=float, default=1e-3, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
+    parser.add_argument('--q_lr', type=float, default=1e-3, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--g_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--q_max_norm', type=float, default=100, help='max norm allowed')
