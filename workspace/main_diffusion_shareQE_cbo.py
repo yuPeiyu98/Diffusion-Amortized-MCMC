@@ -239,12 +239,10 @@ def main(args):
                     z0 = Q_dummy(x)
                 zk_pos = z0.detach().clone()
 
-                mse_s_time = time.time()
-                zk_pos = sample_consensus_post_z_with_gaussian(
-                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
-                            g_l_step_size=args.g_l_step_size, verbose=False
-                        )
-                print(time.time() - mse_s_time)
+                # zk_pos = sample_consensus_post_z_with_gaussian(
+                #             z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                #             g_l_step_size=args.g_l_step_size, verbose=False
+                #         )
 
                 with torch.no_grad():
                     x_hat = G(zk_pos)
