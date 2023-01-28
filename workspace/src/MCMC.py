@@ -94,13 +94,15 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
 
     beta = 40
 
+    __, d, h, w = x.size()
+    x = x.unsqueeze(1).expand(-1, N + 1, -1, -1, -1)
+    x = x.reshape(B * (N + 1), d, h, w)
+
     with torch.no_grad():
         for i in range(g_l_steps):
             z  = z.reshape(B*(N + 1), c)
 
             x_hat = netG(z)
-            x = x.unsqueeze(1).expand(-1, N + 1, -1, -1, -1)
-            x = x.reshape(B * (N + 1), x_hat.size(1), x_hat.size(2), x_hat.size(3))
 
             g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1, 2, 3])
             en = 1.0 / 2.0 * torch.sum(z**2, dim=1)
