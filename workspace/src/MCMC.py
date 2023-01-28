@@ -84,6 +84,37 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
     z.requires_grad = False
     return z.detach()
 
+def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
+    mystr = "Step/cross_entropy/recons_loss: "
+
+    B, c = z.size()
+    z  = z.reshape(B, 1, c)
+    z_ = torch.randn(size=(B,B,c), device=z.device) * 5
+    z  = torch.cat([z, z_], dim=1)
+    z  = z.reshape(B*(B + 1), c)
+
+    beta = 40
+
+    with torch.no_grad():
+        for i in range(g_l_steps):
+            x_hat = netG(z)
+            g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=1)
+            en = 1.0 / 2.0 * torch.sum(z**2, dim=1)
+            total_en = (g_log_lkhd + en).reshape(B, B + 1, c)
+
+            w = (-beta * total_en).softmax(dim=1)
+            z_star = (w * z).sum(dim=1, keepdim=True)
+            z_diff = z - z_star
+            n = torch.randn_like(z_diff)
+
+            z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_diff + 0.9 * g_l_step_size * z_diff * n
+            
+        mystr += "{}/{:.3f}/{:.3f}/{:.8f}  ".format(i, en.min().item(), g_log_lkhd.min().item(), z.mean().item())
+    if verbose:
+        print("Log posterior sampling.")
+        print(mystr)
+    return z_star.detach()
+
 def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
     b = len(x)
