@@ -87,25 +87,25 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
 def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
 
-    B, c = z.size()
+    (B, c), N = z.size(), 10
     z  = z.reshape(B, 1, c)
-    z_ = torch.randn(size=(B,B,c), device=z.device) * 5
+    z_ = torch.randn(size=(B, N, c), device=z.device) * 5
     z  = torch.cat([z, z_], dim=1)
 
     beta = 40
 
     with torch.no_grad():
         for i in range(g_l_steps):
-            z  = z.reshape(B*(B + 1), c)
+            z  = z.reshape(B*(N + 1), c)
 
             x_hat = netG(z)
-            x = x.unsqueeze(1).expand(-1, B + 1, -1, -1, -1)
-            x = x.reshape(B * (B + 1), x_hat.size(1), x_hat.size(2), x_hat.size(3))
+            x = x.unsqueeze(1).expand(-1, N + 1, -1, -1, -1)
+            x = x.reshape(B * (N + 1), x_hat.size(1), x_hat.size(2), x_hat.size(3))
 
             g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1, 2, 3])
             en = 1.0 / 2.0 * torch.sum(z**2, dim=1)
-            total_en = (g_log_lkhd + en).reshape(B, B + 1, 1)
-            z = z.reshape(B, B + 1, c)
+            total_en = (g_log_lkhd + en).reshape(B, N + 1, 1)
+            z = z.reshape(B, N + 1, c)
 
             w = (-beta * total_en).softmax(dim=1)
             z_star = (w * z).sum(dim=1, keepdim=True)
