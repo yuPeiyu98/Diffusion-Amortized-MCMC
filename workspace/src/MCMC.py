@@ -87,7 +87,7 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
 def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
 
-    (B, c), N = z.size(), 100
+    (B, c), N = z.size(), 50
     z  = z.reshape(B, 1, c)
     z_ = torch.randn(size=(B, N, c), device=z.device) * 5
     z  = torch.cat([z, z_], dim=1)
@@ -116,7 +116,7 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
 
             z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_diff + 0.9 * g_l_step_size * z_diff * n
             
-        mystr += "{}/{:.3f}/{:.3f}/{:.8f}  ".format(i, en.min().item(), g_log_lkhd.min().item(), z.mean().item())
+            mystr += "{}/{:.3f}/{:.3f}/{:.8f}  ".format(i, en.min().item(), g_log_lkhd.min().item(), z.mean().item())
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
