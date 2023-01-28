@@ -120,7 +120,7 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
-    return z_star.detach()
+    return z_star.detach().squeeze(1)
 
 def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
