@@ -125,6 +125,10 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
+    with torch.no_grad():
+        g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1, 2, 3])
+        en = 1.0 / 2.0 * torch.sum(z**2, dim=1)
+        total_en = g_log_lkhd + en
     idx = total_en.reshape(B, N + 1).argmin(dim=1)
     idx = idx.reshape(B, 1, 1).expand(-1, -1, c)
     z  = z.reshape(B, N + 1, c).gather(1, idx)
