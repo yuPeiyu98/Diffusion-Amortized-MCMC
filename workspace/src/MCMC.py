@@ -91,6 +91,7 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
     z  = z.reshape(B, 1, c)
     z_ = torch.randn(size=(B, N, c), device=z.device) * 5
     z  = torch.cat([z, z_], dim=1)
+    z.requires_grad = True
 
     beta = 40
 
