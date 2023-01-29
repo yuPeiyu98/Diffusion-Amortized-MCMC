@@ -135,6 +135,7 @@ def main(args):
         with torch.no_grad():
             z0 = Q_dummy(x)
         zk_pos = z0.detach().clone()
+        zk_pos.requires_grad = True
         zk_pos = sample_consensus_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
@@ -238,11 +239,11 @@ def main(args):
                 with torch.no_grad():
                     z0 = Q_dummy(x)
                 zk_pos = z0.detach().clone()
-
-                # zk_pos = sample_consensus_post_z_with_gaussian(
-                #             z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
-                #             g_l_step_size=args.g_l_step_size, verbose=False
-                #         )
+                zk_pos.requires_grad = True
+                zk_pos = sample_consensus_post_z_with_gaussian(
+                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            g_l_step_size=args.g_l_step_size, verbose=False
+                        )
 
                 with torch.no_grad():
                     x_hat = G(zk_pos)
