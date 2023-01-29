@@ -91,6 +91,7 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
     z  = z.reshape(B, 1, c)
     z_ = torch.randn(size=(B, N, c), device=z.device, requires_grad=True)
     z  = torch.cat([z, z_], dim=1)
+    z  = z.reshape(B*(N + 1), c)
 
     # beta = 40
 
@@ -120,7 +121,7 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
             
         mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}  ".format(
             i, en.sum().item(), g_log_lkhd.sum().item(), z.abs().max().item(), (z_grad - z).abs().max().item())
-        
+
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
