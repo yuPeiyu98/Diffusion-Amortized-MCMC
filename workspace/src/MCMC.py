@@ -89,9 +89,8 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
 
     (B, c), N = z.size(), 2
     z  = z.reshape(B, 1, c)
-    z_ = torch.randn(size=(B, N, c), device=z.device) * 5
+    z_ = torch.randn(size=(B, N, c), device=z.device, requires_grad=True)
     z  = torch.cat([z, z_], dim=1)
-    z.requires_grad = True
 
     beta = 40
 
@@ -99,29 +98,29 @@ def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_si
     x = x.unsqueeze(1).expand(-1, N + 1, -1, -1, -1)
     x = x.reshape(B * (N + 1), d, h, w)
 
-    with torch.no_grad():
-        for i in range(g_l_steps):
-            z  = z.reshape(B*(N + 1), c)
+    for i in range(g_l_steps):
+        z  = z.reshape(B*(N + 1), c)
 
-            x_hat = netG(z)
+        x_hat = netG(z)
 
-            g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1, 2, 3])
-            en = 1.0 / 2.0 * torch.sum(z**2, dim=1)
-            total_en = g_log_lkhd + en
+        g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1, 2, 3])
+        en = 1.0 / 2.0 * torch.sum(z**2, dim=1)
+        total_en = g_log_lkhd + en
 
-            # w = (-beta * total_en).softmax(dim=1)
-            # z_star = (w * z).sum(dim=1, keepdim=True)
-            # z_diff = z - z_star
-            # n = torch.randn_like(z_diff)
-            # z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_diff + 0.9 * g_l_step_size * z_diff * n
-            # mystr += "{}/{:.3f}/{:.3f}/{:.8f}  ".format(i, en.mean().item(), g_log_lkhd.mean().item(), z.mean().item())
+        # w = (-beta * total_en).softmax(dim=1)
+        # z_star = (w * z).sum(dim=1, keepdim=True)
+        # z_diff = z - z_star
+        # n = torch.randn_like(z_diff)
+        # z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_diff + 0.9 * g_l_step_size * z_diff * n
+        # mystr += "{}/{:.3f}/{:.3f}/{:.8f}  ".format(i, en.mean().item(), g_log_lkhd.mean().item(), z.mean().item())
 
-            z_grad = torch.autograd.grad(total_en.sum(), z)[0]
+        z_grad = torch.autograd.grad(total_en.sum(), z)[0]
 
-            z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
+        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
             
-            mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}  ".format(
-                i, en.sum().item(), g_log_lkhd.sum().item(), z.abs().max().item(), (z_grad - z).abs().max().item())
+        mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}  ".format(
+            i, en.sum().item(), g_log_lkhd.sum().item(), z.abs().max().item(), (z_grad - z).abs().max().item())
+        
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
