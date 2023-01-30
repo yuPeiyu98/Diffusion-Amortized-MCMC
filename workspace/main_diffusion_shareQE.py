@@ -101,7 +101,7 @@ def main(args):
     # Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=0.001, lr=args.q_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=0.01, lr=args.q_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000

@@ -67,6 +67,11 @@ def sample_langevin_post_z_with_diffusion(z, x, netG, netE, g_l_steps, g_llhd_si
 
 def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
+
+    i_tensor = torch.ones(z.size(0), dtype=torch.float, device=z.device)
+    xemb = torch.zeros(z.size(0), netE.nxemb, device=z.device)
+    logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
+    
     for i in range(g_l_steps):
         x_hat = netG(z)
         g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
@@ -74,10 +79,17 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
         total_en = g_log_lkhd + en
         z_grad = torch.autograd.grad(total_en, z)[0]
 
-        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
+        # prior grad
+        with torch.no_grad():
+            eps_pred = netE.p(z=z, logsnr=logsnr_t, xemb=xemb)
+        zp_grad = eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t))
+
+        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad + zp_grad)
         if g_l_with_noise:
             z.data += g_l_step_size * torch.randn_like(z)
-        mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}  ".format(i, en.item(), g_log_lkhd.item(), z.mean().item(), (z_grad - z).mean().item())
+        mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}/{:.8f}  ".format(
+            i, en.item(), g_log_lkhd.item(), 
+            z.mean().item(), (z_grad - z).mean().item(), zp_grad.mean().item())
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
