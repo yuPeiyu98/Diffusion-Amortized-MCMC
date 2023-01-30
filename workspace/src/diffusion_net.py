@@ -96,7 +96,7 @@ class Encoder_cifar10(nn.Module):
             spectral_norm(
                 nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
                 use_spc_norm
-            )
+            ),
             self.norm(nif * 8, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
