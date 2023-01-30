@@ -69,7 +69,7 @@ class _netE(nn.Module):
 
 ############# Inference model #############
 class Encoder_cifar10(nn.Module):
-    def __init__(self, nc=3, nemb=128, nif=64, use_norm=True, use_spc_norm=True):
+    def __init__(self, nc=3, nemb=128, nif=64, use_norm=True, use_spc_norm=False):
         super().__init__()
         self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
 
@@ -143,7 +143,7 @@ class ConcatSquashLinearSkip(nn.Module):
         return ret + self._skip(x)
 
 class ConcatSquashLinearSkipCtx(nn.Module):
-    def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=True):
+    def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
         super(ConcatSquashLinearSkipCtx, self).__init__()
 
         self._layer = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
