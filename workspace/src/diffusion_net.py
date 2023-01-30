@@ -69,25 +69,40 @@ class _netE(nn.Module):
 
 ############# Inference model #############
 class Encoder_cifar10(nn.Module):
-    def __init__(self, nc=3, nemb=128, nif=64, use_norm=True):
+    def __init__(self, nc=3, nemb=128, nif=64, use_norm=True, use_spc_norm=True):
         super().__init__()
         self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
 
         self.nemb = nemb
         modules = nn.Sequential(
-            nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
+            spectral_norm(
+                nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
+                use_spc_norm
+            ),
             self.norm(nif, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(nif, nif * 2, 4, 2, 1, bias=True),
+            spectral_norm(
+                nn.Conv2d(nif, nif * 2, 4, 2, 1, bias=True),
+                use_spc_norm,
+            ),
             self.norm(nif * 2, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(nif * 2, nif * 4, 4, 2, 1, bias=True),
+            spectral_norm(
+                nn.Conv2d(nif * 2, nif * 4, 4, 2, 1, bias=True),
+                use_spc_norm
+            ),
             self.norm(nif * 4, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
+            spectral_norm(
+                nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
+                use_spc_norm
+            )
             self.norm(nif * 8, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
-            nn.Conv2d(nif * 8, nemb, 4, 1, 0),
+            spectral_norm(
+                nn.Conv2d(nif * 8, nemb, 4, 1, 0),
+                use_spc_norm
+            )
         )
         self.net = nn.Sequential(*modules)
 
@@ -128,22 +143,25 @@ class ConcatSquashLinearSkip(nn.Module):
         return ret + self._skip(x)
 
 class ConcatSquashLinearSkipCtx(nn.Module):
-    def __init__(self, dim_in, dim_out, dim_ctx):
+    def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=True):
         super(ConcatSquashLinearSkipCtx, self).__init__()
 
-        self._layer = nn.Linear(dim_in, dim_out)
+        self._layer = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
         self._layer_ctx = nn.Sequential( 
             nn.SiLU(),
-            nn.Linear(dim_ctx, dim_ctx // 2),
+            spectral_norm(
+                nn.Linear(dim_ctx, dim_ctx // 2),
+                use_spc_norm
+            ),
             nn.SiLU()
         )
 
         #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
-        self._hyper_bias = nn.Linear(dim_ctx // 2, dim_out, bias=False)
+        self._hyper_bias = spectral_norm(nn.Linear(dim_ctx // 2, dim_out, bias=False), use_spc_norm)
         #self._hyper_bias.weight.data.zero_()
-        self._hyper_gate = nn.Linear(dim_ctx // 2, dim_out)
+        self._hyper_gate = spectral_norm(nn.Linear(dim_ctx // 2, dim_out), use_spc_norm)
         #self._hyper_gate.weight.data.zero_()
-        self._skip = nn.Linear(dim_in, dim_out)
+        self._skip = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
 
     def forward(self, ctx, x):
         ctx = self._layer_ctx(ctx)
