@@ -85,7 +85,7 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
         # zp_grad = eps_pred # * torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
         zp_grad = eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
         zp_grad_norm = torch.linalg.norm(zp_grad, dim=1, keepdim=True)
-        mask = zp_grad_norm > 1.0
+        mask = (zp_grad_norm > 1.0) * 1.0
         zp_grad = mask * zp_grad / zp_grad_norm + (1 - mask) * zp_grad
 
         z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad + zp_grad)
