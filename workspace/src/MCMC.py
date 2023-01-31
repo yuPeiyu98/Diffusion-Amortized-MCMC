@@ -69,7 +69,7 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
     mystr = "Step/cross_entropy/recons_loss: "
 
     i_tensor = torch.ones(z.size(0), dtype=torch.float, device=z.device)
-    xemb = torch.zeros(z.size(0), netE.nxemb, device=z.device)
+    xemb = torch.zeros(size=(z.size(0), netE.nxemb), device=z.device)
     logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
     
     for i in range(g_l_steps):
@@ -82,6 +82,7 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
         # prior grad
         with torch.no_grad():
             eps_pred = netE.p(z=z, logsnr=logsnr_t, xemb=xemb)
+            print(eps_pred.shape, logsnr_t.shape)
         zp_grad = eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t))
 
         z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad + zp_grad)
