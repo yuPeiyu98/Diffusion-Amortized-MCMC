@@ -82,7 +82,7 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
         # prior grad
         with torch.no_grad():
             eps_pred = netE.p(z=z, logsnr=logsnr_t, xemb=xemb)
-        zp_grad = eps_pred * torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
+        zp_grad = eps_pred # * torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
 
         z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad + zp_grad)
         if g_l_with_noise:
