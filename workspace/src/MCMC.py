@@ -68,7 +68,7 @@ def sample_langevin_post_z_with_diffusion(z, x, netG, netE, g_l_steps, g_llhd_si
 def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
 
-    i_tensor = torch.zeros(z.size(0), dtype=torch.float, device=z.device)
+    i_tensor = torch.ones(z.size(0), dtype=torch.float, device=z.device)
     xemb = torch.zeros(size=(z.size(0), netE.nxemb), device=z.device)
     logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
     
@@ -85,7 +85,7 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
         # zp_grad = eps_pred # * torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
         zp_grad = eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
         zp_grad_norm = torch.linalg.norm(zp_grad, dim=1, keepdim=True)
-        mask = (zp_grad_norm > 1.0) * 1.0
+        mask = (zp_grad_norm > 100.0) * 1.0
         zp_grad = mask * zp_grad / zp_grad_norm + (1 - mask) * zp_grad
 
         z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad + zp_grad)
