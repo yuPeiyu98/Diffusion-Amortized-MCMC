@@ -393,7 +393,7 @@ class Diffusion_UnetA(nn.Module):
         )
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtx(nz * 7, 128, nxemb + ntemb),
             ConcatSquashLinearSkipCtx(128, 256, nxemb + ntemb),
             ConcatSquashLinearSkipCtx(256, 256, nxemb + ntemb)           
         ])
@@ -406,6 +406,15 @@ class Diffusion_UnetA(nn.Module):
             ConcatSquashLinearSkipCtx(512, 128, nxemb + ntemb),
             ConcatSquashLinearSkipCtx(256, nz, nxemb + ntemb)
         ])
+
+    def input_emb(self, x):
+        x_1 = 2. * np.pi * x
+        x_7 = np.power(2, 7) * np.pi * x
+        x_8 = np.power(2, 8) * np.pi * x
+
+        x_proj = torch.cat([x_1, x_7, x_8], dim=1)
+
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj), x], dim=1)
 
     def forward(self, z, logsnr, xemb):
         b = len(z)
@@ -421,7 +430,7 @@ class Diffusion_UnetA(nn.Module):
             total_emb = torch.cat([temb, xemb], dim=1)
 
         hs = []
-        out = z
+        out = self.input_emb(z)
         for i, layer in enumerate(self.in_layers):
             out = layer(ctx=total_emb, x=out)
             hs.append(out)
