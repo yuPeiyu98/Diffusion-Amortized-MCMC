@@ -76,7 +76,7 @@ class Encoder_cifar10(nn.Module):
         self.nemb = nemb
         modules = nn.Sequential(
             spectral_norm(
-                nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
+                nn.Conv2d(nc * 7, nif, 3, 1, 1, bias=True),
                 use_spc_norm
             ),
             self.norm(nif, affine=True),
@@ -106,8 +106,18 @@ class Encoder_cifar10(nn.Module):
         )
         self.net = nn.Sequential(*modules)
 
-    def forward(self, input):
-        return self.net(input).reshape((len(input), self.nemb))
+    def input_emb(self, x):
+        x_1 = 2. * np.pi * x
+        x_7 = np.power(2, 7) * np.pi * x
+        x_8 = np.power(2, 8) * np.pi * x
+
+        x_proj = torch.cat([x_1, x_7, x_8], dim=1)
+
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj), x], dim=1)
+
+    def forward(self, x):
+        x = self.input_emb(x)
+        return self.net(x).reshape((len(input), self.nemb))
 
 class ConcatSquashLinear(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx):
