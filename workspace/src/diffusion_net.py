@@ -117,7 +117,7 @@ class Encoder_cifar10(nn.Module):
 
     def forward(self, x):
         x = self.input_emb(x)
-        return self.net(x).reshape((len(input), self.nemb))
+        return self.net(x).reshape((len(x), self.nemb))
 
 class ConcatSquashLinear(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx):
