@@ -69,7 +69,8 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
     mystr = "Step/cross_entropy/recons_loss: "
 
     i_tensor = torch.ones(z.size(0), dtype=torch.float, device=z.device)
-    xemb = torch.zeros(size=(z.size(0), netE.nxemb), device=z.device)
+    # xemb = torch.zeros(size=(z.size(0), netE.nxemb), device=z.device)
+    xemb = netE.xemb.expand(z.size(0), -1)
     logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
     
     for i in range(g_l_steps):

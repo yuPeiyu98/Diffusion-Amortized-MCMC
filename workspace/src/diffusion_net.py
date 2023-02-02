@@ -73,8 +73,6 @@ class Encoder_cifar10(nn.Module):
         super().__init__()
         self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
 
-        self.B = nn.Conv2d(nc, nc, 1, 1, 0, bias=True)
-
         self.nemb = nemb
         modules = nn.Sequential(
             spectral_norm(
@@ -108,18 +106,7 @@ class Encoder_cifar10(nn.Module):
         )
         self.net = nn.Sequential(*modules)
 
-    def input_emb(self, x):
-        # x_1 = 2. * np.pi * x
-        # x_7 = np.power(2, 7) * np.pi * x
-        # x_8 = np.power(2, 8) * np.pi * x
-
-        # x_proj = torch.cat([x_1, x_7, x_8], dim=1)
-
-        return torch.cat([torch.sin(2 * np.pi * self.B(x)), 
-                          torch.cos(2 * np.pi * self.B(x)), x], dim=1)
-
     def forward(self, x):
-        x = self.input_emb(x)
         return self.net(x).reshape((len(x), self.nemb))
 
 class ConcatSquashLinear(nn.Module):
@@ -592,6 +579,8 @@ class _netQ_U(nn.Module):
         elif net_arch == 'C':
             self.p = Diffusion_UnetC(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
 
+        self.xemb = nn.Parameter(data=torch.randn(1, self.nxemb), requires_grad=True)
+
         self.cond_w = cond_w
 
     def forward(self, x=None, b=None, device=None):
@@ -602,7 +591,9 @@ class _netQ_U(nn.Module):
             xemb = self.encoder(x)
             device = x.device
         else:
-            xemb = torch.zeros(b, self.nxemb).to(device)
+            # xemb = torch.zeros(b, self.nxemb).to(device)
+            xemb = self.xemb.expand(len(x), -1)
+
         zt = torch.randn(b, self.nz).to(device)
         #print('zt', zt.max(), zt.min())
         for i in reversed(range(0, self.n_interval)):
@@ -642,10 +633,12 @@ class _netQ_U(nn.Module):
         if x is not None: 
             xemb = self.encoder(x)
             if mask is not None:
-                xemb = xemb * mask
+                xemb = xemb * mask + self.xemb.expand(len(x), -1) * (1 - mask)
         else:
             assert mask is None
-            xemb = torch.zeros(len(z), self.nxemb).to(z.device)
+            # xemb = torch.zeros(len(z), self.nxemb).to(z.device)
+            xemb = self.xemb.expand(len(x), -1)
+
         u = torch.rand(len(z)).to(z.device)
         logsnr = logsnr_schedule_fn(u, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
 
