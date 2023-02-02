@@ -76,7 +76,7 @@ class Encoder_cifar10(nn.Module):
         self.nemb = nemb
         modules = nn.Sequential(
             spectral_norm(
-                nn.Conv2d(nc * 7, nif, 3, 1, 1, bias=True),
+                nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
                 use_spc_norm
             ),
             self.norm(nif, affine=True),
