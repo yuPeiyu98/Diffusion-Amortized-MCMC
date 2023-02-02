@@ -106,17 +106,7 @@ class Encoder_cifar10(nn.Module):
         )
         self.net = nn.Sequential(*modules)
 
-    def input_emb(self, x):
-        x_1 = 2. * np.pi * x
-        x_7 = np.power(2, 7) * np.pi * x
-        x_8 = np.power(2, 8) * np.pi * x
-
-        x_proj = torch.cat([x_1, x_7, x_8], dim=1)
-
-        return torch.cat([torch.sin(x_proj), torch.cos(x_proj), x], dim=1)
-
     def forward(self, x):
-        x = self.input_emb(x)
         return self.net(x).reshape((len(x), self.nemb))
 
 class ConcatSquashLinear(nn.Module):
@@ -401,9 +391,10 @@ class Diffusion_UnetA(nn.Module):
             nn.SiLU(),
             nn.Linear(ntemb, ntemb)
         )
+        self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 7, 128, nxemb + ntemb),
+            ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb + ntemb),
             ConcatSquashLinearSkipCtx(128, 256, nxemb + ntemb),
             ConcatSquashLinearSkipCtx(256, 256, nxemb + ntemb)           
         ])
@@ -418,13 +409,14 @@ class Diffusion_UnetA(nn.Module):
         ])
 
     def input_emb(self, x):
-        x_1 = 2. * np.pi * x
-        x_7 = np.power(2, 7) * np.pi * x
-        x_8 = np.power(2, 8) * np.pi * x
+        # x_1 = 2. * np.pi * x
+        # x_7 = np.power(2, 7) * np.pi * x
+        # x_8 = np.power(2, 8) * np.pi * x
 
-        x_proj = torch.cat([x_1, x_7, x_8], dim=1)
+        # x_proj = torch.cat([x_1, x_7, x_8], dim=1)
 
-        return torch.cat([torch.sin(x_proj), torch.cos(x_proj), x], dim=1)
+        return torch.cat([torch.sin(2 * np.pi * torch.matmul(x, self.B)), 
+                          torch.cos(2 * np.pi * torch.matmul(x, self.B)), x], dim=1)
 
     def forward(self, z, logsnr, xemb):
         b = len(z)
