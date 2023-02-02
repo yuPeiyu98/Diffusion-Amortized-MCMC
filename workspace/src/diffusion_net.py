@@ -592,7 +592,7 @@ class _netQ_U(nn.Module):
             device = x.device
         else:
             # xemb = torch.zeros(b, self.nxemb).to(device)
-            xemb = self.xemb.expand(len(x), -1)
+            xemb = self.xemb.expand(b, -1)
 
         zt = torch.randn(b, self.nz).to(device)
         #print('zt', zt.max(), zt.min())
