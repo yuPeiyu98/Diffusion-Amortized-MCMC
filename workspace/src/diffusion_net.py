@@ -642,12 +642,12 @@ class _netQ_U(nn.Module):
                 # xemb = xemb * mask
                 # xemb = xemb * mask + self.xemb.expand(len(x), -1) * (1 - mask)
                 xemb = xemb * mask \
-                     + self.prior_emb(torch.randn(len(x), self.nz, device=device)) * (1 - mask)
+                     + self.prior_emb(torch.randn(len(x), self.nz, device=x.device)) * (1 - mask)
         else:
             assert mask is None
             # xemb = torch.zeros(len(z), self.nxemb).to(z.device)
             # xemb = self.xemb.expand(len(x), -1)
-            xemb = self.prior_emb(torch.randn(len(x), self.nz, device=device))
+            xemb = self.prior_emb(torch.randn(len(z), self.nz, device=z.device))
 
         u = torch.rand(len(z)).to(z.device)
         logsnr = logsnr_schedule_fn(u, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
