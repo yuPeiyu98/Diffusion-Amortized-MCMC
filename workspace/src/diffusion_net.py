@@ -580,6 +580,11 @@ class _netQ_U(nn.Module):
             self.p = Diffusion_UnetC(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
 
         self.xemb = nn.Parameter(data=torch.randn(1, self.nxemb), requires_grad=True)
+        self.prior_emb = nn.Sequential(
+            nn.Linear(nz, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, nxemb)
+        )
 
         self.cond_w = cond_w
 
@@ -592,7 +597,8 @@ class _netQ_U(nn.Module):
             device = x.device
         else:
             # xemb = torch.zeros(b, self.nxemb).to(device)
-            xemb = self.xemb.expand(b, -1)
+            # xemb = self.xemb.expand(b, -1)
+            xemb = self.prior_emb(torch.randn(b, self.nz, device=device))
 
         zt = torch.randn(b, self.nz).to(device)
         #print('zt', zt.max(), zt.min())
@@ -633,11 +639,15 @@ class _netQ_U(nn.Module):
         if x is not None: 
             xemb = self.encoder(x)
             if mask is not None:
-                xemb = xemb * mask + self.xemb.expand(len(x), -1) * (1 - mask)
+                # xemb = xemb * mask
+                # xemb = xemb * mask + self.xemb.expand(len(x), -1) * (1 - mask)
+                xemb = xemb * mask \
+                     + self.prior_emb(torch.randn(len(x), self.nz, device=device)) * (1 - mask)
         else:
             assert mask is None
             # xemb = torch.zeros(len(z), self.nxemb).to(z.device)
-            xemb = self.xemb.expand(len(x), -1)
+            # xemb = self.xemb.expand(len(x), -1)
+            xemb = self.prior_emb(torch.randn(len(x), self.nz, device=device))
 
         u = torch.rand(len(z)).to(z.device)
         logsnr = logsnr_schedule_fn(u, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
