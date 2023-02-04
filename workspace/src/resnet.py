@@ -61,13 +61,11 @@ class BasicBlock(nn.Module):
         identity = x
 
         out = self.conv1(x)
-        if x.size(-1) > 1:
-        	out = self.bn1(out)
+        out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        if x.size(-1) > 1:
-        	out = self.bn2(out)
+        out = self.bn2(out)
 
         if self.downsample is not None:
             identity = self.downsample(x)
@@ -237,17 +235,30 @@ class ResNet(nn.Module):
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         # See note [TorchScript super()]
+        print(x.size())
+
         x = self.conv1(x)
         x = self.bn1(x)
         x = self.relu(x)
+
+        print(x.size())
+
         x = self.maxpool(x)
 
+        print(x.size())
+
         x = self.layer1(x)
+        print(x.size())
         x = self.layer2(x)
+        print(x.size())
         x = self.layer3(x)
+        print(x.size())
         x = self.layer4(x)
+        print(x.size())
 
         x = self.avgpool(x)
+        print(x.size())
+
         x = torch.flatten(x, 1)
         x = self.fc(x)
 
@@ -274,3 +285,9 @@ def resnet18(nxemb = 1024, **kwargs: Any) -> ResNet:
         :members:
     """
     return ResNet(BasicBlock, [2, 2, 2, 2], num_classes=nxemb, **kwargs)
+
+if __name__ == '__main__':
+	net = resnet18(nxemb = 1024)
+
+	x = torch.randn(10, 3, 32, 32)
+	net(x)
