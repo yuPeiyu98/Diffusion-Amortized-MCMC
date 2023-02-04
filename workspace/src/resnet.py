@@ -61,11 +61,13 @@ class BasicBlock(nn.Module):
         identity = x
 
         out = self.conv1(x)
-        out = self.bn1(out)
+        if x.size(-1) > 1:
+        	out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        if x.size(-1) > 1:
+        	out = self.bn2(out)
 
         if self.downsample is not None:
             identity = self.downsample(x)
