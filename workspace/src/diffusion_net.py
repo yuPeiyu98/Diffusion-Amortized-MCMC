@@ -570,7 +570,7 @@ class _netQ_U(nn.Module):
         self.nxemb = nxemb
         self.with_noise = with_noise
         # self.encoder = Encoder_cifar10(nc=nc, nemb=nxemb, nif=nif)
-        self.encoder = resnet18(nxemb=nxemb, nif=nif)
+        self.encoder = resnet18(nxemb=nxemb)
 
         if net_arch == 'vanilla':
             self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
