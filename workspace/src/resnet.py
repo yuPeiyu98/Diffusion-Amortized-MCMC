@@ -4,6 +4,7 @@ from typing import Any, Callable, List, Optional, Type, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch import Tensor
 
 import numpy as np
 
