@@ -147,9 +147,11 @@ def main(args):
         z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
 
+        with torch.no_grad():
+            x0 = G(z0)
         Q_loss_t = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-        Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=z_mask).mean() * 1e-4
-        Q_loss = Q_loss_t - Q_loss_0
+        Q_loss_0 = Q.calculate_loss(x=x0, z=z0, mask=z_mask).mean()
+        Q_loss = Q_loss_t + Q_loss_0
         Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
