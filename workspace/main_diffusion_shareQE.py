@@ -160,8 +160,7 @@ def main(args):
         G.train()
         x_hat = G(zk_pos)
         g_loss_t = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        g_loss_0 = torch.sum((G(z0) - x) ** 2, dim=[1,2,3]).mean()
-        g_loss = g_loss_t - g_loss_0
+        g_loss = g_loss_t
         g_loss.backward()
         if args.g_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
