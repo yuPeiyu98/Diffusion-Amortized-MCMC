@@ -8,7 +8,6 @@ import torch.nn.utils.spectral_norm as sn
 import numpy as np
 import math
 from .diffusion_helper_func import *
-from .resnet import resnet18
 
 def spectral_norm(module, mode=True):
     if mode:
@@ -569,8 +568,7 @@ class _netQ_U(nn.Module):
         self.nz = nz
         self.nxemb = nxemb
         self.with_noise = with_noise
-        # self.encoder = Encoder_cifar10(nc=nc, nemb=nxemb, nif=nif)
-        self.encoder = resnet18(nxemb=nxemb)
+        self.encoder = Encoder_cifar10(nc=nc, nemb=nxemb, nif=nif)
 
         if net_arch == 'vanilla':
             self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
