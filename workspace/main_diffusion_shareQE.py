@@ -148,7 +148,7 @@ def main(args):
         z_mask = z_mask.unsqueeze(-1)
 
         Q_loss_t = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-        Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=z_mask).mean()
+        Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=z_mask).mean() * 1e-4
         Q_loss = Q_loss_t - Q_loss_0
         Q_loss.backward()
         if args.q_is_grad_clamp:
