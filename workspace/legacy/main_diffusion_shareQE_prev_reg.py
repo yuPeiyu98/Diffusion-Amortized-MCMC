@@ -147,10 +147,13 @@ def main(args):
         z_mask = torch.ones(len(zk_pos),).to(zk_pos.device)
         z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
+        a_mask = torch.ones(size=(len(zk_pos),), device=zk_pos.device).unsqueeze(-1)
 
+        with torch.no_grad():
+            x0 = G(z0)
         Q_loss_t = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-        Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=z_mask).mean() * .1
-        Q_loss = Q_loss_t - Q_loss_0
+        Q_loss_0 = Q.calculate_loss(x=x0, z=z0, mask=a_mask).mean()
+        Q_loss = (Q_loss_t + Q_loss_0) * .5
         Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
@@ -160,11 +163,12 @@ def main(args):
         G_optimizer.zero_grad()
         G.train()
 
-        x0 = G(z0)
+        with torch.no_grad():
+            z0_ = Q_dummy(x0)
         x_hat = G(zk_pos)
         g_loss_t = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        g_loss_0 = torch.sum((x0 - x) ** 2, dim=[1,2,3]).mean() * .1
-        g_loss = g_loss_t - g_loss_0
+        g_loss_0 = torch.sum((G(z0_) - x0) ** 2, dim=[1,2,3]).mean()
+        g_loss = (g_loss_t + g_loss_0) * .5
         g_loss.backward()
         if args.g_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
