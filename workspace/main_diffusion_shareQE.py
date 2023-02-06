@@ -147,7 +147,7 @@ def main(args):
         z_mask = torch.ones(len(zk_pos),).to(zk_pos.device)
         z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
-        a_mask = torch.ones(len(zk_pos),).to(zk_pos.device)
+        a_mask = torch.ones(size=(len(zk_pos),), device=zk_pos.device).unsqueeze(-1)
 
         Q_loss_t = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
         Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=a_mask).mean() * 1e-2
