@@ -149,7 +149,7 @@ def main(args):
         z_mask = z_mask.unsqueeze(-1)
 
         Q_loss_t = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-        Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=z_mask).mean() * .1
+        Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=z_mask).mean() * 1e-3
         Q_loss = Q_loss_t - Q_loss_0
         Q_loss.backward()
         if args.q_is_grad_clamp:
@@ -163,7 +163,7 @@ def main(args):
         x0 = G(z0)
         x_hat = G(zk_pos)
         g_loss_t = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        g_loss_0 = torch.sum((x0 - x) ** 2, dim=[1,2,3]).mean() * .1
+        g_loss_0 = torch.sum((x0 - x) ** 2, dim=[1,2,3]).mean() * 1e-3
         g_loss = g_loss_t - g_loss_0
         g_loss.backward()
         if args.g_is_grad_clamp:
