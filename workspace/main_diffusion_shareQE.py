@@ -147,11 +147,8 @@ def main(args):
         z_mask = torch.ones(len(zk_pos),).to(zk_pos.device)
         z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
-        a_mask = torch.ones(size=(len(zk_pos),), device=zk_pos.device).unsqueeze(-1)
 
-        Q_loss_t = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-        Q_loss_0 = Q.calculate_loss(x=x, z=z0, mask=a_mask).mean() * 1e-2
-        Q_loss = Q_loss_t - Q_loss_0
+        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
         Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
@@ -161,11 +158,8 @@ def main(args):
         G_optimizer.zero_grad()
         G.train()
 
-        # x0 = G(z0)
         x_hat = G(zk_pos)
-        g_loss_t = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        # g_loss_0 = torch.sum((x0 - x) ** 2, dim=[1,2,3]).mean() * 1e-3
-        g_loss = g_loss_t # - g_loss_0
+        g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
         g_loss.backward()
         if args.g_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
@@ -287,8 +281,8 @@ if __name__ == "__main__":
     # latent diffusion related parameters
     parser.add_argument('--n_interval_posterior', type=int, default=100, help='number of diffusion steps used here')
     parser.add_argument('--n_interval_prior', type=int, default=100, help='number of diffusion steps used here')
-    parser.add_argument('--logsnr_min', type=float, default=-5.1, help='minimum value of logsnr')
-    parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')
+    parser.add_argument('--logsnr_min', type=float, default=-20, help='minimum value of logsnr')
+    parser.add_argument('--logsnr_max', type=float, default=20, help='maximum value of logsnr')
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='large', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=True, help='whether include noise during inference')
