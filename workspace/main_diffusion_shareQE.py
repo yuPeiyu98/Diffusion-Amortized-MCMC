@@ -280,7 +280,7 @@ if __name__ == "__main__":
     # latent diffusion related parameters
     parser.add_argument('--n_interval_posterior', type=int, default=100, help='number of diffusion steps used here')
     parser.add_argument('--n_interval_prior', type=int, default=100, help='number of diffusion steps used here')
-    parser.add_argument('--logsnr_min', type=float, default=-9, help='minimum value of logsnr') # -5.1
+    parser.add_argument('--logsnr_min', type=float, default=-2.5, help='minimum value of logsnr') # -5.1
     parser.add_argument('--logsnr_max', type=float, default=9.8, help='maximum value of logsnr')  # 9.8
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='large', help='variance type of latent diffusion')
