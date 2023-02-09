@@ -660,6 +660,9 @@ class _netQ_U(nn.Module):
         assert eps.shape == eps_pred.shape == (len(z), self.nz)
         loss = 0.5 * torch.sum((eps - eps_pred) ** 2, dim=1)
 
+        return loss
+
+    def calculate_reg(self, z):
         # reg
         u_T = torch.ones(len(z), device=z.device)
         logsnr_T = logsnr_schedule_fn(u_T, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
@@ -667,7 +670,8 @@ class _netQ_U(nn.Module):
         eps = torch.randn_like(z)
         z_T = zt_dist_T['mean'] + zt_dist_T['std'] * eps
         loss_T = 0.5 * torch.sum(z_T ** 2, dim=1)
-        return loss + loss_T
+
+        return loss_T
 
 class _netQ_uncond(nn.Module):
     def __init__(self, 
