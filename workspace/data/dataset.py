@@ -14,8 +14,8 @@ from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
 class CIFAR10Dataset(torchvision.datasets.CIFAR10):
-    def __init__(self, **kwargs):
-        super(CIFAR10Dataset, self).__init__(kwargs)
+    def __init__(self, root, train, download, transform):
+        super(CIFAR10Dataset, self).__init__(root, train, download, transform)
 
     def __getitem__(index: int):
         img, target = super().__getitem__(index)
