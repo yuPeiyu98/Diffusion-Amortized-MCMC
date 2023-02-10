@@ -122,6 +122,9 @@ def main(args):
     rho = 0.005
     p_mask = args.p_mask
 
+    z_pool = torch.randn(len(trainset), args.nz)
+    print(z_pool.shape)
+
     # begin training
     for iteration in range(start_iter, args.iterations + 1):
         try:
@@ -135,13 +138,25 @@ def main(args):
         Q.eval()
         G.eval()
         # infer z from given x
-        with torch.no_grad():
-            z0 = Q_dummy(x)
+        # with torch.no_grad():
+        z0 = Q_dummy(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
 
+        zl_mask_prob = torch.rand((len(zk_pos),))
+        zl_mask = torch.ones(len(zk_pos),)
+        zl_mask[zl_mask_prob < 0.9] = 0.0
+        zl_mask = zl_mask.unsqueeze(-1).to(zk_pos.device)      
+
+        zl = z_pool[idx].to(zk_pos.device)
+        zl.requires_grad = True
+        zk_pos = zl_mask * zk_pos + (1 - zl_mask) * zl
+
         zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
+        
+        z_pool[idx] = zk_pos.detach().cpu()
+
         # update Q 
         Q_optimizer.zero_grad()
         Q.train()

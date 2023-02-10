@@ -71,7 +71,8 @@ class _netE(nn.Module):
 class Encoder_cifar10(nn.Module):
     def __init__(self, nc=3, nemb=128, nif=64, use_norm=True, use_spc_norm=False):
         super().__init__()
-        self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
+        # self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
+        self.norm = nn.GroupNorm if use_norm else nn.Identity
 
         self.nemb = nemb
         modules = nn.Sequential(
@@ -79,25 +80,25 @@ class Encoder_cifar10(nn.Module):
                 nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
                 use_spc_norm
             ),
-            self.norm(nif, affine=True),
+            self.norm(32, nif, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif, nif * 2, 4, 2, 1, bias=True),
                 use_spc_norm,
             ),
-            self.norm(nif * 2, affine=True),
+            self.norm(32, nif * 2, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif * 2, nif * 4, 4, 2, 1, bias=True),
                 use_spc_norm
             ),
-            self.norm(nif * 4, affine=True),
+            self.norm(32, nif * 4, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
                 use_spc_norm
             ),
-            self.norm(nif * 8, affine=True),
+            self.norm(32, nif * 8, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif * 8, nemb, 4, 1, 0),
