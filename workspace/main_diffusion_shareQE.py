@@ -16,6 +16,7 @@ import pytorch_fid_wrapper as pfw
 import shutil
 import datetime as dt
 import re
+from data.dataset import CIFAR10Dataset
 from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_diffgrad, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
@@ -49,7 +50,8 @@ def main(args):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+    # trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+    trainset = CIFAR10Dataset(root=args.data_path, train=True, download=True, transform=transform_train)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
     train_iter = iter(trainloader)
 
@@ -120,14 +122,18 @@ def main(args):
     rho = 0.005
     p_mask = args.p_mask
 
+    z_pool = torch.randn(len(trainset), args.nz)
+    print(z_pool.shape)
+
     # begin training
     for iteration in range(start_iter, args.iterations + 1):
         try:
-            x, _ = next(train_iter)
+            x, idx = next(train_iter)
         except StopIteration:
             train_iter = iter(trainloader)
-            x, _ = next(train_iter)
+            x, idx = next(train_iter)
         x = x.cuda()
+        print(idx)
 
         Q.eval()
         G.eval()
@@ -136,9 +142,20 @@ def main(args):
         z0 = Q_dummy(x)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
+
+        zl_mask_prob = torch.rand((len(zk_pos),))
+        zl_mask = torch.ones(len(zk_pos),)
+        zl_mask[zl_mask_prob < 0.9] = 0.0
+        zl_mask = zl_mask.unsqueeze(-1).to(zk_pos.device)      
+
+        zl = z_pool[idx].to(zk_pos.device)
+        zk_pos = zl_mask * zk_pos + (1 - zl_mask) * zl
+
         zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
+        z_pool[idx] = zk_pos.detach().cpu()
+
         # update Q 
         Q_optimizer.zero_grad()
         Q.train()
@@ -213,6 +230,7 @@ def main(args):
                 'Q_state_dict': Q.state_dict(),
                 'Q_optimizer': Q_optimizer.state_dict(),
                 'Q_dummy_state_dict': Q_dummy.state_dict(),
+                'z_pool': z_pool,
                 'iter': iteration
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
@@ -229,6 +247,7 @@ def main(args):
                     'Q_state_dict': Q.state_dict(),
                     'Q_optimizer': Q_optimizer.state_dict(),
                     'Q_dummy_state_dict': Q_dummy.state_dict(),
+                    'z_pool': z_pool,
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))

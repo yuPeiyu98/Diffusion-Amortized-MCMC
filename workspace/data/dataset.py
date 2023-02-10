@@ -12,6 +12,18 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
+class CIFAR10Dataset(torchvision.datasets.CIFAR10):
+    def __init__(
+        self, 
+        **kwargs
+    ):
+        super(CIFAR10Dataset, self).__init__()
+
+    def __getitem__(index: int) → Tuple[Any, Any]:
+        img, target = super().__getitem__(index)
+
+        return img, index
+
 ###################################################################
 #################### low-res datasets (32x32) #####################
 ###################################################################
