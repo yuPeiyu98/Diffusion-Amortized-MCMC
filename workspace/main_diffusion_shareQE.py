@@ -149,6 +149,7 @@ def main(args):
         zl_mask = zl_mask.unsqueeze(-1).to(zk_pos.device)      
 
         zl = z_pool[idx].to(zk_pos.device)
+        zl.requires_grad = True
         zk_pos = zl_mask * zk_pos + (1 - zl_mask) * zl
 
         zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
