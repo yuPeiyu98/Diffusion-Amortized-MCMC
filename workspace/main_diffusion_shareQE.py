@@ -133,7 +133,7 @@ def main(args):
             train_iter = iter(trainloader)
             x, idx = next(train_iter)
         x = x.cuda()
-        print(idx)
+        # print(idx)
 
         Q.eval()
         G.eval()
