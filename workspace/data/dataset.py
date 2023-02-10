@@ -20,7 +20,7 @@ class CIFAR10Dataset(torchvision.datasets.CIFAR10):
     ):
         super(CIFAR10Dataset, self).__init__()
 
-    def __getitem__(index: int) -> Tuple[Any, Any]:
+    def __getitem__(index: int):
         img, target = super().__getitem__(index)
 
         return img, index
