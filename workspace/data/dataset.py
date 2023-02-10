@@ -18,7 +18,7 @@ class CIFAR10Dataset(torchvision.datasets.CIFAR10):
         self, 
         **kwargs
     ):
-        super(CIFAR10Dataset, self).__init__()
+        super(CIFAR10Dataset, self).__init__(**kwargs)
 
     def __getitem__(index: int):
         img, target = super().__getitem__(index)
