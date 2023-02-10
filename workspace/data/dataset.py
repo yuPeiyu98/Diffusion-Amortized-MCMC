@@ -5,6 +5,7 @@ import os.path as osp
 import pandas as pd
 import random
 import torch
+import torchvision
 import torchvision.transforms as transforms
 import torchvision.transforms.functional as F
 
