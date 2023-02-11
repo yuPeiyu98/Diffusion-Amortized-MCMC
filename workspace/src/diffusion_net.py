@@ -71,8 +71,8 @@ class _netE(nn.Module):
 class Encoder_cifar10(nn.Module):
     def __init__(self, nc=3, nemb=128, nif=64, use_norm=True, use_spc_norm=False):
         super().__init__()
-        # self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
-        self.norm = nn.GroupNorm if use_norm else nn.Identity
+        self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
+        # self.norm = nn.GroupNorm if use_norm else nn.Identity
 
         self.nemb = nemb
         modules = nn.Sequential(
@@ -80,25 +80,25 @@ class Encoder_cifar10(nn.Module):
                 nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
                 use_spc_norm
             ),
-            self.norm(32, nif, affine=True),
+            self.norm(nif, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif, nif * 2, 4, 2, 1, bias=True),
                 use_spc_norm,
             ),
-            self.norm(32, nif * 2, affine=True),
+            self.norm(nif * 2, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif * 2, nif * 4, 4, 2, 1, bias=True),
                 use_spc_norm
             ),
-            self.norm(32, nif * 4, affine=True),
+            self.norm(nif * 4, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
                 use_spc_norm
             ),
-            self.norm(32, nif * 8, affine=True),
+            self.norm(nif * 8, affine=True),
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif * 8, nemb, 4, 1, 0),
@@ -143,9 +143,9 @@ class ConcatSquashLinearSkip(nn.Module):
         ret = self._layer(x) * gate + bias
         return ret + self._skip(x)
 
-class ConcatSquashLinearSkipCtx(nn.Module):
+class ConcatSquashLinearSkipCtx_(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
-        super(ConcatSquashLinearSkipCtx, self).__init__()
+        super(ConcatSquashLinearSkipCtx_, self).__init__()
 
         self._layer = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
         self._layer_ctx = nn.Sequential( 
@@ -171,6 +171,41 @@ class ConcatSquashLinearSkipCtx(nn.Module):
         bias = self._hyper_bias(ctx)
         ret = self._layer(x) * gate + bias
         return ret + self._skip(x)
+
+class ConcatSquashLinearSkipCtx(nn.Module):
+    def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
+        super(ConcatSquashLinearSkipCtx, self).__init__()
+        self.K = 5
+        self.O = 500
+
+        self._layer = spectral_norm(nn.Linear(dim_in, self.K * self.O), use_spc_norm)
+        self._layer_ctx = nn.Sequential( 
+            nn.SiLU(),
+            spectral_norm(
+                nn.Linear(dim_ctx, self.K * self.O),
+                use_spc_norm
+            )
+        )
+        self.dropout = nn.Dropout(0.1)
+        self.pool = nn.AvgPool1d(self.K, stride=self.K)
+
+        self._out = spectral_norm(nn.Linear(self.O, dim_out), use_spc_norm)
+
+        self._skip = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
+
+    def forward(self, ctx, x):
+        b = x.size(0)
+
+        x = self._layer(x)
+        ctx = self._layer_ctx(ctx)
+
+        exp_out = x * ctx                               # (N, K*O)
+        exp_out = self.dropout(exp_out)                 # (N, K*O)
+        z = self.pool(exp_out.unsqueeze(1)) * self.K    # (N, 1, O)
+        z = torch.sqrt(F.relu(z)) - torch.sqrt(F.relu(-z))
+        z = F.normalize(z.view(b, -1))                  # (N, O)
+
+        return self._out(z) + self._skip(x)
 
 class QKVAttention(nn.Module):
     """
