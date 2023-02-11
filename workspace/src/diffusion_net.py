@@ -196,10 +196,10 @@ class ConcatSquashLinearSkipCtx(nn.Module):
     def forward(self, ctx, x):
         b = x.size(0)
 
-        x = self._layer(x)
+        x_ = self._layer(x)
         ctx = self._layer_ctx(ctx)
 
-        exp_out = x * ctx                               # (N, K*O)
+        exp_out = x_ * ctx                               # (N, K*O)
         exp_out = self.dropout(exp_out)                 # (N, K*O)
         z = self.pool(exp_out.unsqueeze(1)) * self.K    # (N, 1, O)
         z = torch.sqrt(F.relu(z)) - torch.sqrt(F.relu(-z))
