@@ -143,9 +143,9 @@ class ConcatSquashLinearSkip(nn.Module):
         ret = self._layer(x) * gate + bias
         return ret + self._skip(x)
 
-class ConcatSquashLinearSkipCtx_(nn.Module):
+class ConcatSquashLinearSkipCtx(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
-        super(ConcatSquashLinearSkipCtx_, self).__init__()
+        super(ConcatSquashLinearSkipCtx, self).__init__()
 
         self._layer = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
         self._layer_ctx = nn.Sequential( 
@@ -164,17 +164,23 @@ class ConcatSquashLinearSkipCtx_(nn.Module):
         #self._hyper_gate.weight.data.zero_()
         self._skip = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
 
+    def norm(self, x):
+        b = x.size(0)
+        z = torch.sqrt(F.relu(x)) - torch.sqrt(F.relu(-x))
+        z = F.normalize(z.view(b, -1))                 
+        return z
+
     def forward(self, ctx, x):
-        ctx = self._layer_ctx(ctx)
+        ctx = self.norm(self._layer_ctx(ctx))
 
         gate = torch.sigmoid(self._hyper_gate(ctx))
         bias = self._hyper_bias(ctx)
-        ret = self._layer(x) * gate + bias
+        ret = self._layer(self.norm(x)) * gate + bias
         return ret + self._skip(x)
 
-class ConcatSquashLinearSkipCtx(nn.Module):
+class ConcatSquashLinearSkipCtx_(nn.Module):
     def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
-        super(ConcatSquashLinearSkipCtx, self).__init__()
+        super(ConcatSquashLinearSkipCtx_, self).__init__()
         self.K = 5
         self.O = 500
 

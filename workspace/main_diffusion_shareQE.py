@@ -152,9 +152,7 @@ def main(args):
         z_mask = z_mask.unsqueeze(-1)
 
         Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-        Q_reg = Q.calculate_reg(z=z0).mean()
-        Q_loss_a = Q_loss + Q_reg
-        Q_loss_a.backward()
+        Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
         Q_optimizer.step()
@@ -190,8 +188,8 @@ def main(args):
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
             #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
-            print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f}|{:.5f} g_lr {:.8f} q_lr {:.8f}".format(
-                iteration, time.time() - start_time, g_loss.item(), Q_loss_a.item(), Q_reg.item(), g_lr, q_lr))
+            print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
+                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print(zk_pos.max(), zk_pos.min())
         if iteration % args.plot_iter == 0:
             # reconstruction
@@ -248,7 +246,8 @@ def main(args):
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_gaussian(
-                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10 if out_fid > fid_best else 40, 
+                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
