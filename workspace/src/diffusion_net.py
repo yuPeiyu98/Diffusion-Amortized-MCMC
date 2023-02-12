@@ -203,7 +203,7 @@ class EmbMFB(nn.Module):
         self._out = spectral_norm(nn.Linear(self.O, dim_out), use_spc_norm)
 
     def forward(self, z):
-        b = x.size(0)
+        b = z.size(0)
 
         t, x = z[:, :self.ntemb], z[:, self.ntemb:]
 
