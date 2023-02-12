@@ -144,51 +144,56 @@ class ConcatSquashLinearSkip(nn.Module):
         return ret + self._skip(x)
 
 class ConcatSquashLinearSkipCtx(nn.Module):
-    def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
+    # def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
+    def __init__(self, dim_in, dim_out, nxemb, ntemb, use_spc_norm=False):
         super(ConcatSquashLinearSkipCtx, self).__init__()
 
         self._layer = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
-        self._layer_ctx = nn.Sequential( 
-            nn.SiLU(),
-            spectral_norm(
-                nn.Linear(dim_ctx, dim_ctx // 2),
-                use_spc_norm
-            ),
-            nn.SiLU()
-        )
+        # self._layer_ctx = nn.Sequential( 
+        #     nn.SiLU(),
+        #     spectral_norm(
+        #         nn.Linear(dim_ctx, dim_ctx // 2),
+        #         use_spc_norm
+        #     ),
+        #     nn.SiLU()
+        # )
+
+        self._layer_ctx = EmbMFB(nxemb, ntemb, dim_out)
 
         #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
-        self._hyper_bias = spectral_norm(nn.Linear(dim_ctx // 2, dim_out, bias=False), use_spc_norm)
+        self._hyper_bias = spectral_norm(nn.Linear(dim_out, dim_out, bias=False), use_spc_norm)
         #self._hyper_bias.weight.data.zero_()
-        self._hyper_gate = spectral_norm(nn.Linear(dim_ctx // 2, dim_out), use_spc_norm)
+        self._hyper_gate = spectral_norm(nn.Linear(dim_out, dim_out), use_spc_norm)
         #self._hyper_gate.weight.data.zero_()
         self._skip = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
 
-    def norm(self, x):
-        b = x.size(0)
-        z = torch.sqrt(F.relu(x)) - torch.sqrt(F.relu(-x))
-        z = F.normalize(z.view(b, -1))                 
-        return z
-
     def forward(self, ctx, x):
-        ctx = self.norm(self._layer_ctx(ctx))
+        ctx = self._layer_ctx(ctx)
 
         gate = torch.sigmoid(self._hyper_gate(ctx))
         bias = self._hyper_bias(ctx)
-        ret = self._layer(self.norm(x)) * gate + bias
+        ret = self._layer(x) * gate + bias
         return ret + self._skip(x)
 
-class ConcatSquashLinearSkipCtx_(nn.Module):
-    def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
-        super(ConcatSquashLinearSkipCtx_, self).__init__()
+class EmbMFB(nn.Module):
+    def __init__(self, nxemb, ntemb, dim_out, use_spc_norm=False):
+        super(EmbMFB, self).__init__()
         self.K = 5
         self.O = 500
+        self.nxemb = nxemb
+        self.ntemb = ntemb
 
-        self._layer = spectral_norm(nn.Linear(dim_in, self.K * self.O), use_spc_norm)
-        self._layer_ctx = nn.Sequential( 
+        self._layer_t = nn.Sequential( 
             nn.SiLU(),
             spectral_norm(
-                nn.Linear(dim_ctx, self.K * self.O),
+                nn.Linear(ntemb, self.K * self.O),
+                use_spc_norm
+            )
+        )
+        self._layer_x = nn.Sequential( 
+            nn.SiLU(),
+            spectral_norm(
+                nn.Linear(nxemb, self.K * self.O),
                 use_spc_norm
             )
         )
@@ -197,21 +202,21 @@ class ConcatSquashLinearSkipCtx_(nn.Module):
 
         self._out = spectral_norm(nn.Linear(self.O, dim_out), use_spc_norm)
 
-        self._skip = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
-
-    def forward(self, ctx, x):
+    def forward(self, z):
         b = x.size(0)
 
-        x_ = self._layer(x)
-        ctx = self._layer_ctx(ctx)
+        t, x = z[:, :self.ntemb], z[:, self.ntemb:]
 
-        exp_out = x_ * ctx                               # (N, K*O)
+        x_ = self._layer_x(x)
+        t_ = self._layer_t(t)
+
+        exp_out = x_ * t_                               # (N, K*O)
         exp_out = self.dropout(exp_out)                 # (N, K*O)
         z = self.pool(exp_out.unsqueeze(1)) * self.K    # (N, 1, O)
         z = torch.sqrt(F.relu(z)) - torch.sqrt(F.relu(-z))
         z = F.normalize(z.view(b, -1))                  # (N, O)
 
-        return self._out(z) + self._skip(x)
+        return self._out(z)
 
 class QKVAttention(nn.Module):
     """
@@ -436,18 +441,18 @@ class Diffusion_UnetA(nn.Module):
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb + ntemb),
-            ConcatSquashLinearSkipCtx(128, 256, nxemb + ntemb),
-            ConcatSquashLinearSkipCtx(256, 256, nxemb + ntemb)           
+            ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(128, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)           
         ])
         #self.layers[-1]._layer.weight.data.zero_()
 
-        self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb + ntemb) 
+        self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
     
         self.out_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(512, 256, nxemb + ntemb),
-            ConcatSquashLinearSkipCtx(512, 128, nxemb + ntemb),
-            ConcatSquashLinearSkipCtx(256, nz, nxemb + ntemb)
+            ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(512, 128, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(256, nz, nxemb, ntemb)
         ])
 
     def input_emb(self, x):
