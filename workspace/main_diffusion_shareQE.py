@@ -132,13 +132,13 @@ def main(args):
         x = x.cuda()
         # print(idx)
 
-        z_mask_prob = torch.rand((len(zk_pos),)).to(zk_pos.device)
-        z_mask = torch.ones(len(zk_pos),).to(zk_pos.device)
+        z_mask_prob = torch.rand((len(x),), device=x.device)
+        z_mask = torch.ones(len(x), device=x.device)
         z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
 
         x_mask = z_mask.reshape(-1, 1, 1, 1)
-        a = torch.rand(len(zk_pos), device=zk_pos.device) * 0.1 + 0.9
+        a = torch.rand(len(x), device=x.device) * 0.1 + 0.9
         x_ = a * x + torch.sqrt(1 - a ** 2) * torch.randn(x.size(), device=x.device)
         x_ = torch.clamp(x_, min=-1., max=1.)
         x = x_mask * x + (1 - x_mask) * x_
