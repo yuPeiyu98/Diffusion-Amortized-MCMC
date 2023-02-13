@@ -184,14 +184,14 @@ class EmbMFB(nn.Module):
         self.ntemb = ntemb
 
         self._layer_t = nn.Sequential( 
-            nn.SiLU(),
+            nn.LeakyReLU(),
             spectral_norm(
                 nn.Linear(ntemb, self.K * self.O),
                 use_spc_norm
             )
         )
         self._layer_x = nn.Sequential( 
-            nn.SiLU(),
+            nn.LeakyReLU(),
             spectral_norm(
                 nn.Linear(nxemb, self.K * self.O),
                 use_spc_norm
@@ -211,7 +211,7 @@ class EmbMFB(nn.Module):
         t_ = self._layer_t(t)
 
         exp_out = x_ * t_                               # (N, K*O)
-        exp_out = self.dropout(exp_out)                 # (N, K*O)
+        # exp_out = self.dropout(exp_out)               # (N, K*O)
         z = self.pool(exp_out.unsqueeze(1)) * self.K    # (N, 1, O)
         z = torch.sqrt(F.relu(z)) - torch.sqrt(F.relu(-z))
         z = F.normalize(z.view(b, -1))                  # (N, O)
@@ -435,7 +435,7 @@ class Diffusion_UnetA(nn.Module):
         self.time_mlp = nn.Sequential(
             sinu_pos_emb,
             nn.Linear(ntemb, ntemb),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(ntemb, ntemb)
         )
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
