@@ -147,18 +147,22 @@ class ConcatSquashLinearSkipCtx(nn.Module):
     # def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
     def __init__(self, dim_in, dim_out, nxemb, ntemb, use_spc_norm=False):
         super(ConcatSquashLinearSkipCtx, self).__init__()
+        self._layer = nn.Sequential(
+            spectral_norm(
+                nn.Linear(dim_in, dim_out), 
+                use_spc_norm
+            )
+        )
+        self._layer_ctx = nn.Sequential( 
+            nn.LeakyReLU(),
+            spectral_norm(
+                nn.Linear(ntemb + nxemb, dim_out),
+                use_spc_norm
+            ),
+            nn.LeakyReLU()
+        )
 
-        self._layer = spectral_norm(nn.Linear(dim_in, dim_out), use_spc_norm)
-        # self._layer_ctx = nn.Sequential( 
-        #     nn.SiLU(),
-        #     spectral_norm(
-        #         nn.Linear(dim_ctx, dim_ctx // 2),
-        #         use_spc_norm
-        #     ),
-        #     nn.SiLU()
-        # )
-
-        self._layer_ctx = EmbMFB(nxemb, ntemb, dim_out)
+        # self._layer_ctx = EmbMFB(nxemb, ntemb, dim_out)
 
         #self._layer.weight.data = 1e-4 * torch.randn_like(self._layer.weight.data)
         self._hyper_bias = spectral_norm(nn.Linear(dim_out, dim_out, bias=False), use_spc_norm)
@@ -379,13 +383,20 @@ class Diffusion_Unet(nn.Module):
         self.in_layers = nn.ModuleList([
             ConcatSquashLinearSkip(nz, 128, nxemb + ntemb),
             ConcatSquashLinearSkip(128, 256, nxemb + ntemb),
-            ConcatSquashLinearSkip(256, 256, nxemb + ntemb)           
+            ConcatSquashLinearSkip(256, 256, nxemb + ntemb),
+            ConcatSquashLinearSkip(256, 256, nxemb + ntemb),
+            ConcatSquashLinearSkip(256, 256, nxemb + ntemb)
         ])
         #self.layers[-1]._layer.weight.data.zero_()
 
-        self.mid_layer = ConcatSquashLinearSkip(256, 256, nxemb + ntemb) 
+        self.mid_layers = nn.ModuleList([
+            ConcatSquashLinearSkip(256, 256, nxemb + ntemb),
+            ConcatSquashLinearSkip(256, 256, nxemb + ntemb)
+        ])
     
         self.out_layers = nn.ModuleList([
+            ConcatSquashLinearSkip(512, 256, nxemb + ntemb),
+            ConcatSquashLinearSkip(512, 256, nxemb + ntemb),
             ConcatSquashLinearSkip(512, 256, nxemb + ntemb),
             ConcatSquashLinearSkip(512, 128, nxemb + ntemb),
             ConcatSquashLinearSkip(256, nz, nxemb + ntemb)
@@ -410,7 +421,10 @@ class Diffusion_Unet(nn.Module):
             out = layer(ctx=total_emb, x=out)
             hs.append(out)
             out = self.act(out, negative_slope=0.01)
-        out = self.mid_layer(ctx=total_emb, x=out)
+        out = self.mid_layers[0](ctx=total_emb, x=out)
+        for i, layer in enumerate(self.mid_layers[1:]):
+            out = self.act(out, negative_slope=0.01)
+            out = layer(ctx=total_emb, x=out)
         for i, layer in enumerate(self.out_layers):
             out = torch.cat([out, hs.pop()], dim=1)
             out = self.act(out, negative_slope=0.01)

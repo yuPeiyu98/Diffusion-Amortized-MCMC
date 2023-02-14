@@ -137,12 +137,12 @@ def main(args):
         z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
 
-        x_mask = z_mask.reshape(-1, 1, 1, 1)
-        a = torch.rand(len(x), device=x.device) * 0.1 + 0.9
-        a = a.reshape(-1, 1, 1, 1)
-        x_ = a * x + torch.sqrt(1 - a ** 2) * torch.randn(x.size(), device=x.device)
-        x_ = torch.clamp(x_, min=-1., max=1.)
-        x = x_mask * x + (1 - x_mask) * x_
+        # x_mask = z_mask.reshape(-1, 1, 1, 1)
+        # a = torch.rand(len(x), device=x.device) * 0.1 + 0.9
+        # a = a.reshape(-1, 1, 1, 1)
+        # x_ = a * x + torch.sqrt(1 - a ** 2) * torch.randn(x.size(), device=x.device)
+        # x_ = torch.clamp(x_, min=-1., max=1.)
+        # x = x_mask * x + (1 - x_mask) * x_
 
         Q.eval()
         G.eval()
@@ -178,21 +178,21 @@ def main(args):
         Q.eval()
         G.eval()
         # learning rate schedule
-        # if (iteration + 1) % 1000 == 0:
-        #     g_lr = max(g_lr * 0.99, 1e-5)
-        #     q_lr = max(q_lr * 0.99, 1e-5)
-        #     for G_param_group in G_optimizer.param_groups:
-        #         G_param_group['lr'] = g_lr
-        #     for Q_param_group in Q_optimizer.param_groups:
-        #         Q_param_group['lr'] = q_lr
-
-        if (iteration + 1) % 10000 == 0:
-            g_lr = max(g_lr * 0.5, 1e-5)
-            q_lr = max(q_lr * 0.5, 1e-5)
+        if (iteration + 1) % 1000 == 0:
+            g_lr = max(g_lr * 0.99, 1e-5)
+            q_lr = max(q_lr * 0.99, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
+
+        # if (iteration + 1) % 10000 == 0:
+        #     g_lr = max(g_lr * 0.5, 1e-5)
+        #     q_lr = max(q_lr * 0.5, 1e-5)
+        #     for G_param_group in G_optimizer.param_groups:
+        #         G_param_group['lr'] = g_lr
+        #     for Q_param_group in Q_optimizer.param_groups:
+        #         Q_param_group['lr'] = q_lr
 
         if (iteration + 1) % 10 == 0:
             # Update the frozen target models
