@@ -186,19 +186,15 @@ def main(args):
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
 
-        # if (iteration + 1) % 10000 == 0:
-        #     g_lr = max(g_lr * 0.5, 1e-5)
-        #     q_lr = max(q_lr * 0.5, 1e-5)
-        #     for G_param_group in G_optimizer.param_groups:
-        #         G_param_group['lr'] = g_lr
-        #     for Q_param_group in Q_optimizer.param_groups:
-        #         Q_param_group['lr'] = q_lr
+        # if (iteration + 1) % 10 == 0:
+        #     # Update the frozen target models
+        #     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
+        #         target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
 
-        if (iteration + 1) % 10 == 0:
+        if (iteration + 1) % 1000 == 0:
             # Update the frozen target models
             for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-
+                target_param.data.copy_(param.data)
 
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(

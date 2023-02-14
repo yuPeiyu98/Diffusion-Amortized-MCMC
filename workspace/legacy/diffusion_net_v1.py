@@ -154,12 +154,12 @@ class ConcatSquashLinearSkipCtx(nn.Module):
             )
         )
         self._layer_ctx = nn.Sequential( 
-            nn.SiLU(),
+            nn.LeakyReLU(),
             spectral_norm(
                 nn.Linear(ntemb + nxemb, dim_out),
                 use_spc_norm
             ),
-            nn.SiLU()
+            nn.LeakyReLU()
         )
 
         # self._layer_ctx = EmbMFB(nxemb, ntemb, dim_out)
@@ -439,7 +439,7 @@ class Diffusion_Unet(nn.Module):
 class Diffusion_UnetA(nn.Module):
     def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False):
         super().__init__()
-        self.act = F.silu # F.leaky_relu
+        self.act = F.leaky_relu
         self.nz = nz
         self.nxemb = nxemb
         self.ntemb = ntemb 
@@ -449,7 +449,7 @@ class Diffusion_UnetA(nn.Module):
         self.time_mlp = nn.Sequential(
             sinu_pos_emb,
             nn.Linear(ntemb, ntemb),
-            nn.SiLU(),
+            nn.LeakyReLU(),
             nn.Linear(ntemb, ntemb)
         )
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
@@ -497,13 +497,11 @@ class Diffusion_UnetA(nn.Module):
         for i, layer in enumerate(self.in_layers):
             out = layer(ctx=total_emb, x=out)
             hs.append(out)
-            # out = self.act(out, negative_slope=0.01)
-            out = self.act(out)
+            out = self.act(out, negative_slope=0.01)
         out = self.mid_layer(ctx=total_emb, x=out)
         for i, layer in enumerate(self.out_layers):
             out = torch.cat([out, hs.pop()], dim=1)
-            # out = self.act(out, negative_slope=0.01)
-            out = self.act(out)
+            out = self.act(out, negative_slope=0.01)
             out = layer(ctx=total_emb, x=out)
             
         assert out.shape == (b, self.nz)
