@@ -439,7 +439,7 @@ class Diffusion_Unet(nn.Module):
 class Diffusion_UnetA(nn.Module):
     def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False):
         super().__init__()
-        self.act = F.silu # F.leaky_relu
+        self.act = F.leaky_relu # F.silu
         self.nz = nz
         self.nxemb = nxemb
         self.ntemb = ntemb 
@@ -457,13 +457,21 @@ class Diffusion_UnetA(nn.Module):
         self.in_layers = nn.ModuleList([
             ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(128, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)           
+            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),           
         ])
         # self.layers[-1]._layer.weight.data.zero_()
 
-        self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
-    
+        # self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
+        self.mid_layers = nn.ModuleList([
+            ConcatSquashLinearSkip(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkip(256, 256, nxemb, ntemb)
+        ])
+
         self.out_layers = nn.ModuleList([
+            ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(512, 128, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(256, nz, nxemb, ntemb)
@@ -497,13 +505,17 @@ class Diffusion_UnetA(nn.Module):
         for i, layer in enumerate(self.in_layers):
             out = layer(ctx=total_emb, x=out)
             hs.append(out)
-            # out = self.act(out, negative_slope=0.01)
-            out = self.act(out)
-        out = self.mid_layer(ctx=total_emb, x=out)
+            out = self.act(out, negative_slope=0.01)
+            # out = self.act(out)
+        # out = self.mid_layer(ctx=total_emb, x=out)
+        out = self.mid_layers[0](ctx=total_emb, x=out)
+        for i, layer in enumerate(self.mid_layers[1:]):
+            out = self.act(out, negative_slope=0.01)
+            out = layer(ctx=total_emb, x=out)
         for i, layer in enumerate(self.out_layers):
             out = torch.cat([out, hs.pop()], dim=1)
-            # out = self.act(out, negative_slope=0.01)
-            out = self.act(out)
+            out = self.act(out, negative_slope=0.01)
+            # out = self.act(out)
             out = layer(ctx=total_emb, x=out)
             
         assert out.shape == (b, self.nz)
