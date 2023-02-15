@@ -452,10 +452,10 @@ class Diffusion_UnetA(nn.Module):
             nn.SiLU(),
             nn.Linear(ntemb, ntemb)
         )
-        self.B = nn.Parameter(data=torch.randn(nz * 2, nz // 2), requires_grad=True)
+        self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz, 128, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(128, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
