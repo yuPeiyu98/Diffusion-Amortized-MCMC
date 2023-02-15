@@ -455,7 +455,7 @@ class Diffusion_UnetA(nn.Module):
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz, 128, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(128, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
