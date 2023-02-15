@@ -193,17 +193,17 @@ def main(args):
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
 
-        if (iteration + 1) % 10 == 0:
-            # Update the frozen target models
-            for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-
-        # for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
-        #     target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-        # if (iteration + 1) % 1000 == 0:
+        # if (iteration + 1) % 10 == 0:
         #     # Update the frozen target models
-        #     for param, target_param in zip(Q_eval.parameters(), Q_dummy.parameters()):
-        #         target_param.data.copy_(param.data)
+        #     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
+        #         target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
+
+        for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
+            target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
+        if (iteration + 1) % 1000 == 0:
+            # Update the frozen target models
+            for param, target_param in zip(Q_eval.parameters(), Q_dummy.parameters()):
+                target_param.data.copy_(param.data)
 
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
@@ -241,7 +241,7 @@ def main(args):
         
         if iteration % args.fid_iter == 0:
             fid_s_time = time.time()
-            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q_eval, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
             if out_fid < fid_best:
                 fid_best = out_fid
                 print('Saving best checkpoint')
@@ -264,7 +264,7 @@ def main(args):
             for x, _ in mloader:
                 x = x.cuda()
                 with torch.no_grad():
-                    z0 = Q(x)
+                    z0 = Q_eval(x)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_gaussian(
