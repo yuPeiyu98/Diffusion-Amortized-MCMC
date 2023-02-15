@@ -465,8 +465,8 @@ class Diffusion_UnetA(nn.Module):
 
         # self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
         self.mid_layers = nn.ModuleList([
-            ConcatSquashLinearSkip(256, 256, nxemb, ntemb),
-            ConcatSquashLinearSkip(256, 256, nxemb, ntemb)
+            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)
         ])
 
         self.out_layers = nn.ModuleList([
