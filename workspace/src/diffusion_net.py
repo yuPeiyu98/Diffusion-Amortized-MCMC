@@ -458,21 +458,21 @@ class Diffusion_UnetA(nn.Module):
             ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(128, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),           
+            # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),           
         ])
         # self.layers[-1]._layer.weight.data.zero_()
 
         # self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
         self.mid_layers = nn.ModuleList([
             ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)
+            # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)
         ])
 
         self.out_layers = nn.ModuleList([
             ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
+            # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
+            # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(512, 128, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(256, nz, nxemb, ntemb)
         ])

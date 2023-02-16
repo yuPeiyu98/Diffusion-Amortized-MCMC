@@ -159,7 +159,7 @@ def main(args):
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q_dummy, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         # update Q 
         Q_optimizer.zero_grad()
@@ -193,17 +193,17 @@ def main(args):
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
 
-        # if (iteration + 1) % 10 == 0:
-        #     # Update the frozen target models
-        #     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-        #         target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-
-        for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
-            target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-        if (iteration + 1) % 1000 == 0:
+        if (iteration + 1) % 10 == 0:
             # Update the frozen target models
-            for param, target_param in zip(Q_eval.parameters(), Q_dummy.parameters()):
-                target_param.data.copy_(param.data)
+            for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
+                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
+
+        # for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
+        #     target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
+        # if (iteration + 1) % 1000 == 0:
+        #     # Update the frozen target models
+        #     for param, target_param in zip(Q_eval.parameters(), Q_dummy.parameters()):
+        #         target_param.data.copy_(param.data)
 
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
@@ -324,7 +324,7 @@ if __name__ == "__main__":
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
+    parser.add_argument('--g_lr', type=float, default=1e-4, help='learning rate for generator')
     parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
