@@ -18,7 +18,7 @@ import datetime as dt
 import re
 from data.dataset import CIFAR10
 from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_mh, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -159,7 +159,7 @@ def main(args):
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_prior(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_prior_mh(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         # update Q 
         Q_optimizer.zero_grad()
@@ -281,7 +281,7 @@ def main(args):
                     z0 = Q(x)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_prior(
+                zk_pos = sample_langevin_post_z_with_prior_mh(
                             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False

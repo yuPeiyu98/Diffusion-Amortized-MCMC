@@ -87,6 +87,62 @@ def sample_langevin_post_z_with_prior(z, x, netG, netE, g_l_steps, g_llhd_sigma,
         print(mystr)
     return z.detach()
 
+def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
+    mystr = "Step/cross_entropy/recons_loss: "
+
+    ##### initial k0 state
+    x_hat = netG(z)
+    g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
+    z_n = 1.0 / 2.0 * torch.sum(z**2) 
+    en = netE(z).sum()
+    total_en = g_log_lkhd + en + z_n
+    z_grad = torch.autograd.grad(total_en, z)[0]
+
+    z_0 = z.clone().detach()
+    z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
+    noise = g_l_step_size * torch.randn_like(z)
+    z = z + noise
+
+    for i in range(g_l_steps):
+        ##### mh adjustment
+        log_q_k1_k = - 0.5 * (noise ** 2).sum(dim=1)
+
+        # k1 state
+        x_hat_ = netG(z)
+        g_log_lkhd_ = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat_ - x) ** 2)
+        z_n_ = 1.0 / 2.0 * torch.sum(z**2) 
+        en_ = netE(z).sum()
+        total_en_ = g_log_lkhd_ + en_ + z_n_
+        z_grad_ = torch.autograd.grad(total_en_, z)[0]
+
+        z_0_ = z.clone().detach()
+        z_ = z - 0.5 * g_l_step_size * g_l_step_size * z_grad_
+        log_q_k_k1 = - 0.5 * torch.sum((z_0 - z_) ** 2, dim=1) / (g_l_step_size ** 2)
+
+        # potential new z
+        noise_ = g_l_step_size * torch.randn_like(z_)
+        z_ = z_ + noise_
+
+        # ad-rj
+        prop = - total_en_ + log_q_k_k1 + total_en - log_q_k1_k
+        p_acc = torch.minimum(torch.ones_like(prop), torch.exp(prop))
+        replace_idx = p_acc >= torch.rand_like(p_acc)
+        acc_rate = torch.mean(replace_idx.float()).item()
+
+        ##### update status
+        z_0[replace_idx] = z_0_[replace_idx]
+        z[replace_idx] = z_[replace_idx]
+        noise[replace_idx] = noise_[replace_idx]
+
+        mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}/{:.3f}  ".format(
+            i, en_.item(), g_log_lkhd_.item(), 
+            z_n_.item(), z_grad_.mean().item(), acc_rate)
+
+    if verbose:
+        print("Log posterior sampling.")
+        print(mystr)
+    return z_0.detach()
+
 def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
 
