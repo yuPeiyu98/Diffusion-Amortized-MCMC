@@ -177,12 +177,12 @@ def sample_hmc_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g
         # first half-step update for the momentum and 
         # the full step update for the data
         p = p0 - 0.5 * step_sz * grad(z_)
-        z_ = z_ + step_size * p
+        z_ = z_ + step_sz * p
         for __ in range(L):
-            p = p + step_size * grad(z_)
-            z_ = z_ + step_size * p
+            p = p + step_sz * grad(z_)
+            z_ = z_ + step_sz * p
         # the last half-step update for the momentum    
-        p = p + step_size * grad(z_)
+        p = p + step_sz * grad(z_)
         
         # Metropolis-Hastings Correction
         en_0, en_e = en(z), en(z_)
