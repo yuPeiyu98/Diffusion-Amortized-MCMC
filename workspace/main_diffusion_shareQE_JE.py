@@ -155,7 +155,7 @@ def main(args):
         # infer z from given x
         with torch.no_grad():
             z0 = Q_dummy(x)
-            zp = Q(x=None, b=x.size(0), device=x.device)
+            zp = Q_dummy(x=None, b=x.size(0), device=x.device)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
 
