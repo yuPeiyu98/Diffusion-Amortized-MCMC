@@ -98,7 +98,7 @@ def main(args):
     for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
         target_param.data.copy_(param.data)
 
-    E = _netE(nz=args.nz, e_sn=True)
+    E = _netE(nz=args.nz)
 
     G.cuda()
     Q.cuda()
@@ -185,7 +185,8 @@ def main(args):
         # update E
         E_optimizer.zero_grad()
         E.train()
-        E_loss = E(zk_pos).mean() - E(zp).mean()
+        e_pos, e_neg = E(zk_pos), E(zp)
+        E_loss = e_pos.mean() - e_neg.mean() + (e_pos ** 2).mean() + (e_neg ** 2).mean()
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
