@@ -98,7 +98,7 @@ def main(args):
     for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
         target_param.data.copy_(param.data)
 
-    E = _netE(nz=args.nz)
+    E = _netE(nz=args.nz, e_sn=True)
 
     G.cuda()
     Q.cuda()
