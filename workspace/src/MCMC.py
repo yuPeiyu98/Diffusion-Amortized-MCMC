@@ -100,6 +100,113 @@ def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sig
         print(mystr)
     return z.detach()
 
+def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
+    mystr = "Step/cross_entropy/recons_loss: "
+
+    i_tensor = torch.ones(z.size(0), dtype=torch.float, device=z.device)
+    # xemb = torch.zeros(size=(z.size(0), netE.nxemb), device=z.device)
+    xemb = netE.xemb.expand(z.size(0), -1)
+    logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
+    
+    for i in range(g_l_steps):
+        x_hat = netG(z)
+        g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
+        en = 1.0 / 2.0 * torch.sum(z**2)
+        total_en = g_log_lkhd + en
+        z_grad = torch.autograd.grad(total_en, z)[0]
+
+        # prior grad
+        with torch.no_grad():
+            eps_pred = netE.p(z=z, logsnr=logsnr_t, xemb=xemb)
+        # zp_grad = eps_pred # * torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
+        zp_grad = eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
+        zp_grad_norm = torch.linalg.norm(zp_grad, dim=1, keepdim=True)
+        mask = (zp_grad_norm > 100.0) * 1.0
+        zp_grad = mask * zp_grad / zp_grad_norm + (1 - mask) * zp_grad
+
+        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad + zp_grad)
+        if g_l_with_noise:
+            z.data += g_l_step_size * torch.randn_like(z)
+        mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}/{:.8f}  ".format(
+            i, en.item(), g_log_lkhd.item(), 
+            z.mean().item(), (z_grad - z).mean().item(), zp_grad.mean().item())
+    if verbose:
+        print("Log posterior sampling.")
+        print(mystr)
+    return z.detach()
+
+def sample_hmc_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
+    mystr = "Step/cross_entropy/recons_loss: "
+
+    i_tensor = torch.ones(z.size(0), dtype=torch.float, device=z.device)
+    # xemb = torch.zeros(size=(z.size(0), netE.nxemb), device=z.device)
+    xemb = netE.xemb.expand(z.size(0), -1)
+    logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
+    
+    th = 0.651
+    L = 3
+    step_sz = g_l_step_size
+    step_mul = 1.02
+
+    def en(z_):
+        x_hat = netG(z_)
+        g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
+        en = 1.0 / 2.0 * torch.sum(z_**2)
+        total_en = g_log_lkhd + en
+
+        return total_en
+
+    def grad(z_):
+        total_en = en(z_)
+        z_grad = torch.autograd.grad(total_en, z_)[0]
+
+        # prior grad
+        with torch.no_grad():
+            eps_pred = netE.p(z=z_, logsnr=logsnr_t, xemb=xemb)
+        # zp_grad = eps_pred # * torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
+        zp_grad = eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
+        zp_grad_norm = torch.linalg.norm(zp_grad, dim=1, keepdim=True)
+        mask = (zp_grad_norm > 100.0) * 1.0
+        zp_grad = mask * zp_grad / zp_grad_norm + (1 - mask) * zp_grad
+
+        return z_grad + zp_grad
+
+    for k in range(g_l_steps):
+        # initialize the dynamics and the momentum
+        p0, z_ = torch.randn_like(z), z.clone().detach().requires_grad_(True)
+        # first half-step update for the momentum and 
+        # the full step update for the data
+        p = p0 - 0.5 * step_sz * grad(z_)
+        z_ = z_ + step_size * p
+        for __ in range(L):
+            p = p + step_size * grad(z_)
+            z_ = z_ + step_size * p
+        # the last half-step update for the momentum    
+        p = p + step_size * grad(z_)
+        
+        # Metropolis-Hastings Correction
+        en_0, en_e = en(z), en(z_)
+        H0 = en_0 + 0.5 * torch.sum(p0.square().view(p0.size(0), -1), 1)
+        H1 = en_e + 0.5 * torch.sum(p.square().view(p.size(0), -1), 1)    
+        p_acc = torch.minimum(torch.ones_like(H0), torch.exp(H0 - H1))
+        replace_idx = p_acc > torch.rand_like(p_acc)
+        z[replace_idx] = z_[replace_idx].detach().clone()
+
+        acc_rate = torch.mean(replace_idx.float()).item()
+
+        mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}/{:.8f}  ".format(
+                k, en_e.item(), en_0.item(), 
+                z.mean().item(), step_sz, acc_rate)
+
+        if acc_rate > th:
+            step_sz *= step_mul
+        else:
+            step_sz /= step_mul
+    if verbose:
+        print("Log posterior sampling.")
+        print(mystr)
+    return z.detach()
+
 def sample_consensus_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
 
