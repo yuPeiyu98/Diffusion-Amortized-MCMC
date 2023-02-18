@@ -148,6 +148,8 @@ def sample_hmc_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g
     step_sz = g_l_step_size
     step_mul = 1.02
 
+    z.requires_grad = False
+
     def en(z_):
         x_hat = netG(z_)
         g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
