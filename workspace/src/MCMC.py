@@ -65,36 +65,23 @@ def sample_langevin_post_z_with_diffusion(z, x, netG, netE, g_l_steps, g_llhd_si
     z.requires_grad = False
     return z.detach()
 
-def sample_langevin_post_z_with_gaussian(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
+def sample_langevin_post_z_with_prior(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
 
-    i_tensor = torch.ones(z.size(0), dtype=torch.float, device=z.device)
-    # xemb = torch.zeros(size=(z.size(0), netE.nxemb), device=z.device)
-    xemb = netE.xemb.expand(z.size(0), -1)
-    logsnr_t = logsnr_schedule_fn(i_tensor / (netE.n_interval - 1.), logsnr_min=netE.logsnr_min, logsnr_max=netE.logsnr_max)
-    
     for i in range(g_l_steps):
         x_hat = netG(z)
         g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
-        en = 1.0 / 2.0 * torch.sum(z**2)
-        total_en = g_log_lkhd + en
+        z_n = 1.0 / 2.0 * torch.sum(z**2) 
+        en = netE(z).sum()
+        total_en = g_log_lkhd + en + z_n
         z_grad = torch.autograd.grad(total_en, z)[0]
 
-        # prior grad
-        with torch.no_grad():
-            eps_pred = netE.p(z=z, logsnr=logsnr_t, xemb=xemb)
-        # zp_grad = eps_pred # * torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
-        zp_grad = eps_pred / torch.rsqrt(1. + torch.exp(logsnr_t)).unsqueeze(1)
-        zp_grad_norm = torch.linalg.norm(zp_grad, dim=1, keepdim=True)
-        mask = (zp_grad_norm > 100.0) * 1.0
-        zp_grad = mask * zp_grad / zp_grad_norm + (1 - mask) * zp_grad
-
-        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * (z_grad + zp_grad)
+        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
         if g_l_with_noise:
             z.data += g_l_step_size * torch.randn_like(z)
-        mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}/{:.8f}  ".format(
+        mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}  ".format(
             i, en.item(), g_log_lkhd.item(), 
-            z.mean().item(), (z_grad - z).mean().item(), zp_grad.mean().item())
+            zn.item(), zp_grad.mean().item())
     if verbose:
         print("Log posterior sampling.")
         print(mystr)

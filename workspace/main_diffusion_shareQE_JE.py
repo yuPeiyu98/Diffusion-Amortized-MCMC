@@ -18,7 +18,7 @@ import datetime as dt
 import re
 from data.dataset import CIFAR10
 from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_hmc_post_z_with_gaussian, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -98,8 +98,11 @@ def main(args):
     for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
         target_param.data.copy_(param.data)
 
+    E = _netE(nz=args.nz)
+
     G.cuda()
     Q.cuda()
+    E.cuda()
     Q_dummy.cuda()
     Q_eval.cuda()
 
@@ -111,6 +114,7 @@ def main(args):
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=0.01, lr=args.q_lr, betas=(0.5, 0.999))
+    E_optimizer = optim.AdamW(E.parameters(), weight_decay=0.01, lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -126,6 +130,7 @@ def main(args):
     
     g_lr = args.g_lr
     q_lr = args.q_lr
+    e_lr = args.e_lr
     rho = 0.005
     p_mask = args.p_mask
 
@@ -144,22 +149,17 @@ def main(args):
         z_mask[z_mask_prob < p_mask] = 0.0
         z_mask = z_mask.unsqueeze(-1)
 
-        # x_mask = z_mask.reshape(-1, 1, 1, 1)
-        # a = torch.rand(len(x), device=x.device) * 0.1 + 0.9
-        # a = a.reshape(-1, 1, 1, 1)
-        # x_ = a * x + torch.sqrt(1 - a ** 2) * torch.randn(x.size(), device=x.device)
-        # x_ = torch.clamp(x_, min=-1., max=1.)
-        # x = x_mask * x + (1 - x_mask) * x_
-
         Q.eval()
         G.eval()
+        E.eval()
         # infer z from given x
         with torch.no_grad():
             z0 = Q_dummy(x)
+            zp = Q(x=None, b=x.size(0), device=x.device)
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_gaussian(z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_prior(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         # update Q 
         Q_optimizer.zero_grad()
@@ -182,16 +182,29 @@ def main(args):
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
 
+        # update E
+        E_optimizer.zero_grad()
+        E.train()
+        E_loss = E(zk_pos).mean() - E(zp).mean()
+        E_loss.backward()
+        if args.e_is_grad_clamp:
+            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
+        E_optimizer.step()
+
         Q.eval()
         G.eval()
+        E.eval()
         # learning rate schedule
         if (iteration + 1) % 1000 == 0:
             g_lr = max(g_lr * 0.99, 1e-5)
             q_lr = max(q_lr * 0.99, 1e-5)
+            e_lr = max(e_lr * 0.99, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
+            for E_param_group in E_optimizer.param_groups:
+                E_param_group['lr'] = e_lr
 
         if (iteration + 1) % 10 == 0:
             # Update the frozen target models
@@ -267,8 +280,8 @@ def main(args):
                     z0 = Q(x)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_gaussian(
-                            z=zk_pos, x=x, netG=G, netE=Q, g_l_steps=10, # if out_fid > fid_best else 40, 
+                zk_pos = sample_langevin_post_z_with_prior(
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
@@ -325,11 +338,13 @@ if __name__ == "__main__":
 
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
-    parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
+    parser.add_argument('--e_lr', type=float, default=1e-4, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
+    parser.add_argument('--e_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--g_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--q_max_norm', type=float, default=100, help='max norm allowed')
+    parser.add_argument('--e_max_norm', type=float, default=100, help='max norm allowed')
     parser.add_argument('--g_max_norm', type=float, default=100, help='max norm allowed')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
