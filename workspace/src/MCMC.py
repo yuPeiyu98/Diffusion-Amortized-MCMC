@@ -151,8 +151,8 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
         z_t = (z + noise).requires_grad_(True)
 
         mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}/{:.3f}  ".format(
-            i, en_.item(), g_log_lkhd_.item(), 
-            z_n_.item(), z_grad_.mean().item(), acc_rate)
+            i, en_.mean().item(), g_log_lkhd_.mean().item(), 
+            z_n_.mean().item(), z_grad_.mean().item(), acc_rate)
 
     if verbose:
         print("Log posterior sampling.")
