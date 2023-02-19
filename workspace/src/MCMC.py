@@ -144,8 +144,8 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
         #     z[replace_idx] = z_[replace_idx]
         #     noise[replace_idx] = noise_[replace_idx]
 
-        z_0[replace_idx] = z_0_[replace_idx]
-        z[replace_idx] = z_[replace_idx]
+        z_0[replace_idx] = z_0_[replace_idx].clone()
+        z[replace_idx] = z_[replace_idx].clone()
         noise = g_l_step_size * torch.randn_like(z)
         z_t = z + noise
 
