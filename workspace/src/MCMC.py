@@ -128,27 +128,23 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
         acc_rate = torch.mean(replace_idx.float()).item()
 
         ##### update status
-        # if acc_rate < 0.574:
-        #     g_l_step_size *= 2
-        # else:
-        #     g_l_step_size *= 0.5
+        if acc_rate < 0.574:
+            g_l_step_size *= 2
+        else:
+            g_l_step_size *= 0.5
 
-        # if acc_rate < .1:
-        #     z_0 = torch.randn_like(z)
-        #     noise = torch.randn_like(z)
+        if acc_rate < .1:
+            z_0 = torch.randn_like(z)
+            z = torch.randn_like(z)
+            noise = g_l_step_size * torch.randn_like(z)
+            z_t = torch.randn_like(z, requires_grad=True)
 
-        #     z = torch.randn_like(z, requires_grad=True)
-
-        #     g_l_step_size = g_l_step_size_
-        # else:
-        #     z_0[replace_idx] = z_0_[replace_idx]
-        #     z[replace_idx] = z_[replace_idx]
-        #     noise[replace_idx] = noise_[replace_idx]
-
-        z_0[replace_idx] = z_0_[replace_idx]
-        z[replace_idx] = z_[replace_idx].detach()
-        noise = g_l_step_size * torch.randn_like(z)
-        z_t = (z + noise).requires_grad_(True)
+            g_l_step_size = g_l_step_size_
+        else:
+            z_0[replace_idx] = z_0_[replace_idx]
+            z[replace_idx] = z_[replace_idx].detach()
+            noise = g_l_step_size * torch.randn_like(z)
+            z_t = (z + noise).requires_grad_(True)
 
         mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}/{:.3f}  ".format(
             i, en_.mean().item(), g_log_lkhd_.mean().item(), 
