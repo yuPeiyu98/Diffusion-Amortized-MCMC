@@ -104,6 +104,7 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
     noise = g_l_step_size * torch.randn_like(z)
     z_t = z + noise
 
+    z = z.detach()
     for i in range(g_l_steps):
         ##### mh adjustment
         log_q_k1_k = - 0.5 * (noise ** 2).sum(dim=1) / (g_l_step_size ** 2)
@@ -144,10 +145,10 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
         #     z[replace_idx] = z_[replace_idx]
         #     noise[replace_idx] = noise_[replace_idx]
 
-        z_0[replace_idx] = z_0_[replace_idx].clone()
-        z[replace_idx] = z_[replace_idx].clone()
+        z_0[replace_idx] = z_0_[replace_idx]
+        z[replace_idx] = z_[replace_idx].detach()
         noise = g_l_step_size * torch.randn_like(z)
-        z_t = z + noise
+        z_t = (z + noise).requires_grad_(True)
 
         mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}/{:.3f}  ".format(
             i, en_.item(), g_log_lkhd_.item(), 
