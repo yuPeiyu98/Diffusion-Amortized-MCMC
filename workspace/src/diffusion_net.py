@@ -55,7 +55,7 @@ class _netE(nn.Module):
         apply_sn = sn if e_sn else lambda x: x
         f = nn.LeakyReLU(0.2)
         self.ebm = nn.Sequential(
-            apply_sn(nn.Linear(nz, ndf)),
+            apply_sn(nn.Linear(nz * 2, ndf)),
             f,
 
             apply_sn(nn.Linear(ndf, ndf)),
@@ -64,8 +64,14 @@ class _netE(nn.Module):
             apply_sn(nn.Linear(ndf, nez))
         )
 
+        self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
+
+    def input_emb(self, x):
+        return torch.cat([torch.sin(2 * np.pi * torch.matmul(x, self.B)), 
+                          torch.cos(2 * np.pi * torch.matmul(x, self.B)), x], dim=1)
+
     def forward(self, z):
-        return self.ebm(z.squeeze()).squeeze()
+        return self.ebm(self.input_emb(z)).squeeze()
 
 ############# Inference model #############
 class Encoder_cifar10(nn.Module):
