@@ -137,9 +137,9 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
 
         ##### update status
         if acc_rate < .1:
-            z_0 = torch.randn_like(z)
-            z = torch.randn_like(z)
-            noise = torch.randn_like(z)
+            z_0 = torch.randn_like(z, requires_grad=True)
+            z = torch.randn_like(z, requires_grad=True)
+            noise = torch.randn_like(z, requires_grad=True)
 
             g_l_step_size = g_l_step_size_
         else:
