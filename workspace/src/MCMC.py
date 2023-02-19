@@ -93,36 +93,32 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
 
     ##### initial k0 state
     x_hat = netG(z)
-    g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
-    z_n = 1.0 / 2.0 * torch.sum(z**2) 
-    en = netE(z).sum()
+    g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2, dim=[1, 2, 3])
+    z_n = 1.0 / 2.0 * torch.sum(z**2, dim=1) 
+    en = netE(z)
     total_en = g_log_lkhd + en + z_n
-    z_grad = torch.autograd.grad(total_en, z)[0]
+    z_grad = torch.autograd.grad(total_en.sum(), z)[0]
 
     z_0 = z.clone().detach()
     z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
     noise = g_l_step_size * torch.randn_like(z)
-    z = z + noise
+    z_t = z + noise
 
     for i in range(g_l_steps):
         ##### mh adjustment
-        log_q_k1_k = - 0.5 * (noise ** 2).sum(dim=1)
+        log_q_k1_k = - 0.5 * (noise ** 2).sum(dim=1) / (g_l_step_size ** 2)
 
         # k1 state
-        x_hat_ = netG(z)
-        g_log_lkhd_ = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat_ - x) ** 2)
-        z_n_ = 1.0 / 2.0 * torch.sum(z**2) 
-        en_ = netE(z).sum()
+        x_hat_ = netG(z_t)
+        g_log_lkhd_ = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat_ - x) ** 2, dim=[1, 2, 3])
+        z_n_ = 1.0 / 2.0 * torch.sum(z_t**2, dim=1) 
+        en_ = netE(z_t)
         total_en_ = g_log_lkhd_ + en_ + z_n_
-        z_grad_ = torch.autograd.grad(total_en_, z)[0]
+        z_grad_ = torch.autograd.grad(total_en_.sum(), z_t)[0]
 
-        z_0_ = z.clone().detach()
-        z_ = z - 0.5 * g_l_step_size * g_l_step_size * z_grad_
+        z_0_ = z_t.clone().detach()
+        z_ = z_t - 0.5 * g_l_step_size * g_l_step_size * z_grad_
         log_q_k_k1 = - 0.5 * torch.sum((z_0 - z_) ** 2, dim=1) / (g_l_step_size ** 2)
-
-        # potential new z
-        noise_ = g_l_step_size * torch.randn_like(z_)
-        z_ = z_ + noise_
 
         # ad-rj
         prop = - total_en_ + log_q_k_k1 + total_en - log_q_k1_k
@@ -130,23 +126,28 @@ def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sig
         replace_idx = p_acc >= torch.rand_like(p_acc)
         acc_rate = torch.mean(replace_idx.float()).item()
 
-        if acc_rate < 0.574:
-            g_l_step_size *= 2
-        else:
-            g_l_step_size *= 0.5
-
         ##### update status
-        if acc_rate < .1:
-            z_0 = torch.randn_like(z)
-            noise = torch.randn_like(z)
+        # if acc_rate < 0.574:
+        #     g_l_step_size *= 2
+        # else:
+        #     g_l_step_size *= 0.5
 
-            z = torch.randn_like(z, requires_grad=True)
+        # if acc_rate < .1:
+        #     z_0 = torch.randn_like(z)
+        #     noise = torch.randn_like(z)
 
-            g_l_step_size = g_l_step_size_
-        else:
-            z_0[replace_idx] = z_0_[replace_idx]
-            z[replace_idx] = z_[replace_idx]
-            noise[replace_idx] = noise_[replace_idx]
+        #     z = torch.randn_like(z, requires_grad=True)
+
+        #     g_l_step_size = g_l_step_size_
+        # else:
+        #     z_0[replace_idx] = z_0_[replace_idx]
+        #     z[replace_idx] = z_[replace_idx]
+        #     noise[replace_idx] = noise_[replace_idx]
+
+        z_0[replace_idx] = z_0_[replace_idx]
+        z[replace_idx] = z_[replace_idx]
+        noise = g_l_step_size * torch.randn_like(z)
+        z_t = z + noise
 
         mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}/{:.3f}  ".format(
             i, en_.item(), g_log_lkhd_.item(), 
