@@ -52,7 +52,7 @@ def main(args):
     ])
     # trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
     trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=1, drop_last=True)
+    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     train_iter = iter(trainloader)
 
     start_time = time.time()
@@ -62,10 +62,10 @@ def main(args):
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
-    testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=1, drop_last=False)
+    testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
 
     mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
-    mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=1, drop_last=False)
+    mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
     
     # pre-calculating statistics for fid calculation
     fid_data_true = []
