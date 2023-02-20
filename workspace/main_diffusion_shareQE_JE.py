@@ -162,7 +162,7 @@ def main(args):
         zk_pos = sample_langevin_post_z_with_prior(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
-        for __ in range(6):
+        for __ in range(10):
             # update Q 
             Q_optimizer.zero_grad()
             Q.train()
