@@ -188,7 +188,7 @@ def main(args):
         E.train()
         e_pos, e_neg, e_neg_0 = E(zk_pos), E(zp), E(z0)
 
-        a = torch.rand(zk_pos.size(), device=zp.device)
+        a = torch.rand(size=x.size(0), device=zp.device)
         z_mix = a * zk_pos + (1 - a) * zp
         e_mix = E(z_mix)
         reg = e_mix - (a * e_pos + (1 - a) * e_neg)
