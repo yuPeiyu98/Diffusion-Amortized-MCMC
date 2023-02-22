@@ -51,7 +51,8 @@ def main(args):
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     # trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+    # trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+    trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     train_iter = iter(trainloader)
 
@@ -61,10 +62,12 @@ def main(args):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+    # testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+    testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
 
-    mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+    # mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+    mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
     
     # pre-calculating statistics for fid calculation
@@ -302,7 +305,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1, help='random seed')
-    parser.add_argument('--log_path', type=str, default='../logs/cifar', help='log directory')
+    parser.add_argument('--log_path', type=str, default='../logs/svhn', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     
