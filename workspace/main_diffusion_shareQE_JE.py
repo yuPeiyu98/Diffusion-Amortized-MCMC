@@ -186,8 +186,16 @@ def main(args):
         # update E
         E_optimizer.zero_grad()
         E.train()
-        e_pos, e_neg = E(zk_pos), E(torch.cat([zp, z0], dim=0))
-        E_loss = e_pos.mean() - e_neg.mean() + (e_pos ** 2).mean() + (e_neg ** 2).mean()
+        e_pos, e_neg, e_neg_0 = E(zk_pos), E(zp), E(z0)
+
+        a = torch.rand(zk_pos.size(), device=zp.device)
+        z_mix = a * zk_pos + (1 - a) * zp
+        e_mix = E(z_mix)
+        reg = e_mix - (a * e_pos + (1 - a) * e_neg)
+
+        e_neg = torch.cat([e_neg, e_neg_0], dim=0)
+
+        E_loss = e_pos.mean() - e_neg.mean() + (e_pos ** 2).mean() + (e_neg ** 2).mean() + (reg ** 2).mean()
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
