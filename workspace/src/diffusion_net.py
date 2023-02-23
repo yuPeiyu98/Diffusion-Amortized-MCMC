@@ -66,12 +66,8 @@ class _netE(nn.Module):
 
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
 
-    def input_emb(self, x):
-        return torch.cat([torch.sin(2 * np.pi * torch.matmul(x, self.B)), 
-                          torch.cos(2 * np.pi * torch.matmul(x, self.B)), x], dim=1)
-
     def forward(self, z):
-        return self.ebm(self.input_emb(z)).squeeze()
+        return self.ebm(z).squeeze()
 
 ############# Inference model #############
 class Encoder_cifar10(nn.Module):
