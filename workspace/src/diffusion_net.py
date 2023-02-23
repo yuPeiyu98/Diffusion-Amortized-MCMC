@@ -55,7 +55,7 @@ class _netE(nn.Module):
         apply_sn = sn if e_sn else lambda x: x
         f = nn.LeakyReLU(0.2)
         self.ebm = nn.Sequential(
-            apply_sn(nn.Linear(nz * 2, ndf)),
+            apply_sn(nn.Linear(nz, ndf)),
             f,
 
             apply_sn(nn.Linear(ndf, ndf)),
@@ -63,8 +63,6 @@ class _netE(nn.Module):
 
             apply_sn(nn.Linear(ndf, nez))
         )
-
-        self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
 
     def forward(self, z):
         return self.ebm(z).squeeze()
