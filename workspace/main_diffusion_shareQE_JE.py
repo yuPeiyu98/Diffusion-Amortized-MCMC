@@ -253,6 +253,8 @@ def main(args):
                 'Q_optimizer': Q_optimizer.state_dict(),
                 'Q_dummy_state_dict': Q_dummy.state_dict(),
                 'Q_eval_state_dict': Q_eval.state_dict(),
+                'E_state_dict': E.state_dict(),
+                'E_optimizer': E_optimizer.state_dict(),
                 'iter': iteration
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
@@ -270,6 +272,8 @@ def main(args):
                     'Q_optimizer': Q_optimizer.state_dict(),
                     'Q_dummy_state_dict': Q_dummy.state_dict(),
                     'Q_eval_state_dict': Q_eval.state_dict(),
+                    'E_state_dict': E.state_dict(),
+                    'E_optimizer': E_optimizer.state_dict(),
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
