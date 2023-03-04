@@ -2,6 +2,7 @@
 # Include addtional functions for MCMC inference
 # ############################################################################
 import torch
+import torch.nn.functional as F
 import torchvision
 import pytorch_fid_wrapper as pfw
 
@@ -375,18 +376,45 @@ def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_
         
     return fid
 
-def gen_samples_with_diffusion_prior(b, device, netE, netG):
+def gen_samples_with_diffusion_prior(b, device, netQ, netG):
     with torch.no_grad():
-        zk_prior = netE(x=None, b=b, device=device)
+        zk_prior = netQ(x=None, b=b, device=device)
         x = netG(zk_prior)
     return x, zk_prior
 
-def calculate_fid_with_diffusion_prior(n_samples, device, netE, netG, real_m, real_s, save_name):
+def gen_samples_with_diffusion_prior_E(b, device, netQ, netG, netE):
+    K = 10
+    with torch.no_grad():
+        zk_prior = netQ(x=None, b=b * K, device=device).reshape(b, K, -1)
+        prob = -netE(zk_prior)
+        i = F.gumbel_softmax(zk_prior, dim=1, hard=True).argmax(dim=1).unsqueeze(1)
+        zk_prior = torch.gather(zk_prior, dim=1, index=i).squeeze(1)
+        x = netG(zk_prior)
+    return x, zk_prior
+
+def calculate_fid_with_diffusion_prior(n_samples, device, netQ, netG, netE, real_m, real_s, save_name):
     bs = 500
     fid_samples = []
         
     for i in range(n_samples // bs):
-        cur_samples, _ = gen_samples_with_diffusion_prior(bs, device, netE, netG)
+        cur_samples, _ = gen_samples_with_diffusion_prior(bs, device, netQ, netG)
+        fid_samples.append(cur_samples.detach().clone())
+        
+    fid_samples = torch.cat(fid_samples, dim=0)
+    fid_samples = (1.0 + torch.clamp(fid_samples, min=-1.0, max=1.0)) / 2.0
+    fid = pfw.fid(fid_samples, real_m=real_m, real_s=real_s, device="cuda:0")
+    if save_name is not None:
+        save_images = fid_samples[:64].clone().detach().cpu()
+        torchvision.utils.save_image(save_images, save_name, normalize=True, nrow=8)
+        
+    return fid
+
+def calculate_fid_with_diffusion_prior_E(n_samples, device, netQ, netG, netE, real_m, real_s, save_name):
+    bs = 500
+    fid_samples = []
+        
+    for i in range(n_samples // bs):
+        cur_samples, _ = gen_samples_with_diffusion_prior_E(bs, device, netQ, netG, netE)
         fid_samples.append(cur_samples.detach().clone())
         
     fid_samples = torch.cat(fid_samples, dim=0)
