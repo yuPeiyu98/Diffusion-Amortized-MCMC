@@ -115,17 +115,17 @@ def main(args):
         
         fid_s_time = time.time()
         out_fid = calculate_fid_with_diffusion_prior(
-        	n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, netE=E,
-        	real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
-      	print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
+            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=E,
+            real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
+        print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
-      	fid_s_time = time.time()
+        fid_s_time = time.time()
         out_fid = calculate_fid_with_diffusion_prior_E(
-        	n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, netE=E,
-        	real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
-      	print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
+            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=E,
+            real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
+        print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
-		mse_lss = 0.0
+        mse_lss = 0.0
         mse_s_time = time.time()
 
         for x, _ in mloader:
@@ -145,17 +145,17 @@ def main(args):
                 g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
 
             if save_recon_imgs:
-            	with torch.no_grad():
-            		x_hat_q = G(z0)
+                with torch.no_grad():
+                    x_hat_q = G(z0)
                 save_images = x[:64].detach().cpu()
                 torchvision.utils.save_image(
-                	torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_obs.png'.format(img_dir, iteration), normalize=True, nrow=8)
+                    torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_obs.png'.format(img_dir, iteration), normalize=True, nrow=8)
                 save_images = x_hat[:64].detach().cpu()
                 torchvision.utils.save_image(
-                	torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post.png'.format(img_dir, iteration), normalize=True, nrow=8)
+                    torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post.png'.format(img_dir, iteration), normalize=True, nrow=8)
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(
-                	torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
+                    torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
 
             mse_lss += g_loss.item()
 
@@ -169,7 +169,7 @@ if __name__ == "__main__":
     parser.add_argument('--log_path', type=str, default='../logs/cifar', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
     parser.add_argument('--resume_path', type=str, default='../logs/cifar/20230302_143524/ckpt/best.pth.tar', 
-    									 help='pretrained ckpt path for resuming training')
+                                         help='pretrained ckpt path for resuming training')
     
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
