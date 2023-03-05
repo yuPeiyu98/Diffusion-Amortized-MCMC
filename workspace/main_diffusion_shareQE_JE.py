@@ -46,13 +46,13 @@ def main(args):
 
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
+        # transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     # trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    # trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
+    trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+    # trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     train_iter = iter(trainloader)
 
@@ -62,12 +62,12 @@ def main(args):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    # testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
-    testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test)
+    testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+    # testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
 
-    # mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
-    mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
+    mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+    # mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
     
     # pre-calculating statistics for fid calculation
@@ -109,14 +109,12 @@ def main(args):
     Q_dummy.cuda()
     Q_eval.cuda()
 
-    # G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
-    # Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
-
     # G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     # Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-4, lr=args.q_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-2, lr=args.q_lr, betas=(0.5, 0.999))
+    # Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
     E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
@@ -165,7 +163,12 @@ def main(args):
         zk_pos = sample_langevin_post_z_with_prior(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
-        for __ in range(2):
+        for __ in range(6):
+            # z_mask_prob = torch.rand((len(x),), device=x.device)
+            # z_mask = torch.ones(len(x), device=x.device)
+            # z_mask[z_mask_prob < p_mask] = 0.0
+            # z_mask = z_mask.unsqueeze(-1)
+
             # update Q 
             Q_optimizer.zero_grad()
             Q.train()
@@ -240,7 +243,7 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netE=Q, netG=G) 
+            samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netQ=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -261,7 +264,9 @@ def main(args):
         
         if iteration % args.fid_iter == 0:
             fid_s_time = time.time()
-            out_fid = calculate_fid_with_diffusion_prior(n_samples=args.n_fid_samples, device=z0.device, netE=Q, netG=G, real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            out_fid = calculate_fid_with_diffusion_prior(
+                    n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E, 
+                    real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
             if out_fid < fid_best:
                 fid_best = out_fid
                 print('Saving best checkpoint')
@@ -309,7 +314,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1, help='random seed')
-    parser.add_argument('--log_path', type=str, default='../logs/svhn', help='log directory')
+    parser.add_argument('--log_path', type=str, default='../logs/cifar', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     
