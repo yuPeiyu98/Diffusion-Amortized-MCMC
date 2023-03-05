@@ -39,8 +39,8 @@ def main(args):
     timestamp = re.sub(r'[\:-]','', timestamp) # replace unwanted chars 
     timestamp = re.sub(r'[\s]','_', timestamp) # with regex and re.sub
     
-    img_dir = os.path.join(args.log_path, timestamp, 'imgs')
-    ckpt_dir = os.path.join(args.log_path, timestamp, 'ckpt')
+    img_dir = os.path.join(args.resume_path, 'imgs')
+    ckpt_dir = os.path.join(args.resume_path, 'ckpt')
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(ckpt_dir, exist_ok=True)
     shutil.copyfile(__file__, os.path.join(args.log_path, timestamp, osp.basename(__file__)))
@@ -106,8 +106,9 @@ def main(args):
     mse_best = 10000
     save_recon_imgs = False
     if args.resume_path is not None:
-        print('load from ', args.resume_path)
-        state_dict = torch.load(args.resume_path)
+        ckpt_path = os.path.join(args.resume_path, 'ckpt/best.pth.tar')
+        print('load from ', ckpt_path)
+        state_dict = torch.load(ckpt_path)
         G.load_state_dict(state_dict['G_state_dict'])
         Q.load_state_dict(state_dict['Q_state_dict'])
         Q_dummy.load_state_dict(state_dict['Q_dummy_state_dict'])
@@ -168,7 +169,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=1, help='random seed')
     parser.add_argument('--log_path', type=str, default='../logs/cifar', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
-    parser.add_argument('--resume_path', type=str, default='../logs/cifar/20230302_143524/ckpt/best.pth.tar', 
+    parser.add_argument('--resume_path', type=str, default='../logs/cifar/20230302_143524/', 
                                          help='pretrained ckpt path for resuming training')
     
     # data related parameters
