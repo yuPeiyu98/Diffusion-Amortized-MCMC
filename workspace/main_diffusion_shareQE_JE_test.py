@@ -43,7 +43,7 @@ def main(args):
     ckpt_dir = os.path.join(args.resume_path, 'ckpt')
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(ckpt_dir, exist_ok=True)
-    shutil.copyfile(__file__, os.path.join(args.log_path, timestamp, osp.basename(__file__)))
+    shutil.copyfile(__file__, os.path.join(args.resume_path, osp.basename(__file__)))
 
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
