@@ -48,6 +48,39 @@ class _netG_cifar10(nn.Module):
         _z = z.reshape((len(z), self.nz, 1, 1))
         return self.gen(_z)
 
+class _netG_svhn(nn.Module):
+    def __init__(self, nz=100, ngf=64, nc=3, use_spc_norm=False):
+        super().__init__()
+        self.nz = nz
+        f = nn.LeakyReLU(0.2)
+
+        self.gen = nn.Sequential(
+            spectral_norm(
+                nn.ConvTranspose2d(nz, ngf*8, 4, 1, 0, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*8, ngf*4, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*4, ngf*2, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*2, nc, 4, 2, 1),
+                use_spc_norm
+            ),
+            nn.Tanh()
+        )    
+    
+    def forward(self, z):
+        _z = z.reshape((len(z), self.nz, 1, 1))
+        return self.gen(_z)
+
 ############ Latent EBM ##################
 class _netE(nn.Module):
     def __init__(self, nz=128, ndf=200, nez=1, e_sn=False):

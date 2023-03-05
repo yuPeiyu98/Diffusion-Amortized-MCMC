@@ -17,7 +17,7 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import CIFAR10
-from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond, _netQ_U
+from src.diffusion_net import _netG_cifar10, _netG_svhn, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_mh, sample_langevin_post_z_with_gaussian, gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 
@@ -83,7 +83,8 @@ def main(args):
     fid_data_true, testset, testloader = None, None, None
 
     # define models
-    G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    # G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
@@ -162,7 +163,8 @@ def main(args):
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_prior(z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise, \
+        zk_pos = sample_langevin_post_z_with_prior(
+            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         for __ in range(2):
@@ -322,7 +324,7 @@ if __name__ == "__main__":
     
     # network structure related parameters
     parser.add_argument('--nz', type=int, default=100, help='z vector length')
-    parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
+    parser.add_argument('--ngf', type=int, default=64, help='base channel numbers in G')
     parser.add_argument('--nif', type=int, default=64, help='base channel numbers in Q encoder')
     parser.add_argument('--nxemb', type=int, default=1024, help='x embedding dimension in Q')
     parser.add_argument('--ntemb', type=int, default=128, help='t embedding dimension in Q')
