@@ -38,11 +38,11 @@ def main(args):
     timestamp = re.sub(r'[\:-]','', timestamp) # replace unwanted chars 
     timestamp = re.sub(r'[\s]','_', timestamp) # with regex and re.sub
     
-    img_dir = os.path.join(args.log_path, timestamp, 'imgs')
-    ckpt_dir = os.path.join(args.log_path, timestamp, 'ckpt')
+    img_dir = os.path.join(args.log_path, args.dataset, timestamp, 'imgs')
+    ckpt_dir = os.path.join(args.log_path, args.dataset, timestamp, 'ckpt')
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(ckpt_dir, exist_ok=True)
-    shutil.copyfile(__file__, os.path.join(args.log_path, timestamp, osp.basename(__file__)))
+    shutil.copyfile(__file__, os.path.join(args.log_path, args.dataset, timestamp, osp.basename(__file__)))
 
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
@@ -50,27 +50,28 @@ def main(args):
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    # trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    # trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
-    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
-    train_iter = iter(trainloader)
-
-    start_time = time.time()
-    print("Begin calculating real image statistics")
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    # testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
-    testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test)
+    if args.dataset == 'cifar10':
+        args.nz = 128
+        trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+        mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+    elif args.dataset == 'svhn':
+        args.nz = 100
+        trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
+        testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test) 
+        mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
+    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
-
-    # mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
-    mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
+    train_iter = iter(trainloader)
     
     # pre-calculating statistics for fid calculation
+    start_time = time.time()
+    print("Begin calculating real image statistics")
     fid_data_true = []
     for x, _ in testloader:
         fid_data_true.append(x)
@@ -83,8 +84,10 @@ def main(args):
     fid_data_true, testset, testloader = None, None, None
 
     # define models
-    # G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
-    G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    if args.dataset == 'cifar10':
+        G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    elif args.dataset == 'svhn':
+        G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
@@ -313,7 +316,8 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1, help='random seed')
-    parser.add_argument('--log_path', type=str, default='../logs/svhn', help='log directory')
+    parser.add_argument('--dataset', type=str, default='cifar10')
+    parser.add_argument('--log_path', type=str, default='../logs/', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     

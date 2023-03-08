@@ -47,7 +47,7 @@ def main(args):
 
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
-        transforms.RandomHorizontalFlip(),
+        # transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
