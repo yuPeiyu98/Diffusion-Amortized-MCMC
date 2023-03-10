@@ -17,7 +17,7 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import CIFAR10
-from src.diffusion_net import _netG_cifar10, _netE, _netQ, _netQ_uncond, _netQ_U
+from src.diffusion_net import _netG_cifar10, _netG_svhn, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_mh, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid_with_diffusion_prior_E
 
@@ -84,7 +84,8 @@ def main(args):
     fid_data_true, testset, testloader = None, None, None
 
     # define models
-    G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    # G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
@@ -169,7 +170,7 @@ if __name__ == "__main__":
     parser.add_argument('--seed', type=int, default=1, help='random seed')
     parser.add_argument('--log_path', type=str, default='../logs/cifar', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
-    parser.add_argument('--resume_path', type=str, default='../logs/cifar/20230302_143524/', 
+    parser.add_argument('--resume_path', type=str, default='../logs/svhn/20230304_204909/', 
                                          help='pretrained ckpt path for resuming training')
     
     # data related parameters
