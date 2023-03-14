@@ -387,7 +387,8 @@ def gen_samples_with_diffusion_prior_E(b, device, netQ, netG, netE):
     with torch.no_grad():
         zk_prior = netQ(x=None, b=b * K, device=device).reshape(b, K, -1)
         logit = -netE(zk_prior) # (b, K)
-        i = F.gumbel_softmax(logit, dim=1, hard=True).argmax(dim=1).unsqueeze(1)
+        # i = F.gumbel_softmax(logit, dim=1, hard=True).argmax(dim=1).unsqueeze(1)
+        i = F.softmax(logit, dim=1).argmax(dim=1).unsqueeze(1)
         i = i.unsqueeze(1).expand(-1, -1, zk_prior.size(-1))
         zk_prior = torch.gather(zk_prior, dim=1, index=i).squeeze(1)
         x = netG(zk_prior)
