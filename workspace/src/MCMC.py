@@ -88,6 +88,35 @@ def sample_langevin_post_z_with_prior(z, x, netG, netE, g_l_steps, g_llhd_sigma,
         print(mystr)
     return z.detach()
 
+def sample_langevin_post_z_with_prior_test(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
+    mystr = "Step/cross_entropy/recons_loss: "
+
+    loss = torch.ones(z.size(0), device=z.device) * 100
+
+    for i in range(g_l_steps):
+        x_hat = netG(z)
+        g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
+        z_n = 1.0 / 2.0 * torch.sum(z**2) 
+        en = netE(z).sum()
+        total_en = g_log_lkhd + en + z_n
+        z_grad = torch.autograd.grad(total_en, z)[0]
+
+        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
+        z.data += g_l_step_size * torch.randn_like(z)
+
+        with torch.no_grad():
+            x_ = netG(z)
+            g_loss = torch.mean((x_ - x) ** 2, dim=[1,2,3])
+            loss = torch.min(loss, g_loss)
+
+        mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}  ".format(
+            i, en.item(), g_log_lkhd.item(), 
+            z_n.item(), z_grad.mean().item())
+    if verbose:
+        print("Log posterior sampling.")
+        print(mystr)
+    return z.detach(), loss
+
 def sample_langevin_post_z_with_prior_mh(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
     g_l_step_size_ = g_l_step_size
