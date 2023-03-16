@@ -18,7 +18,7 @@ import datetime as dt
 import re
 from data.dataset import CIFAR10
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_mh, sample_langevin_post_z_with_gaussian
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_nce, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 
@@ -108,23 +108,21 @@ def main(args):
     for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
         target_param.data.copy_(param.data)
 
-    E = _netE(nz=args.nz)
+    E_0 = _netE(nz=args.nz)
+    E_1 = _netE(nz=args.nz)
+    E_2 = _netE(nz=args.nz)
 
     G.cuda()
     Q.cuda()
-    E.cuda()
+    E_0.cuda()
+    E_1.cuda()
+    E_2.cuda()
     Q_dummy.cuda()
     Q_eval.cuda()
 
-    # G_optimizer = optim.Adam(G.parameters(), lr=1e-5, betas=(0.5, 0.999))
-    # Q_optimizer = optim.Adam(Q.parameters(), lr=1e-5, betas=(0.5, 0.999))
-
-    # G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    # Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
-
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-2, lr=args.q_lr, betas=(0.5, 0.999))
-    E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
+    E_optimizer = optim.Adam([E_0.parameters(), E_1.parameters(), E_2.parameters()], lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -161,7 +159,9 @@ def main(args):
 
         Q.eval()
         G.eval()
-        E.eval()
+        E_0.eval()
+        E_1.eval()
+        E_2.eval()
         # infer z from given x
         with torch.no_grad():
             z0 = Q_dummy(x)
@@ -169,8 +169,8 @@ def main(args):
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_prior(
-            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
+        zk_pos = sample_langevin_post_z_with_prior_nce(
+            z=zk_pos, x=x, netG=G, netE=[E_0, E_1, E_2], g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         for __ in range(6):
@@ -196,9 +196,22 @@ def main(args):
 
         # update E
         E_optimizer.zero_grad()
-        E.train()
-        e_pos, e_neg = E(zk_pos), E(zp)
-        E_loss = e_pos.mean() - e_neg.mean() + (e_pos ** 2).mean() + (e_neg ** 2).mean()
+        E_0.train()
+        E_1.train()
+        E_2.train()
+
+        e0_pos, e0_neg = E_0(zp), E_0(torch.randn_like(z0))
+        e1_pos, e1_neg = E_1(z0), E_1(zp)
+        e2_pos, e2_neg = E_2(zk_pos), E_2(z0)
+
+        tp, tn = torch.ones_like(e0_pos), torch.zeros_like(e0_neg)
+        e0_lss = F.binary_cross_entropy_with_logits(e0_pos, tp) + \
+                 F.binary_cross_entropy_with_logits(e0_neg, tn)
+        e1_lss = F.binary_cross_entropy_with_logits(e1_pos, tp) + \
+                 F.binary_cross_entropy_with_logits(e1_neg, tn)
+        e2_lss = F.binary_cross_entropy_with_logits(e2_pos, tp) + \
+                 F.binary_cross_entropy_with_logits(e2_neg, tn)
+        E_loss = e0_lss + e1_lss + e2_lss
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
@@ -206,7 +219,9 @@ def main(args):
 
         Q.eval()
         G.eval()
-        E.eval()
+        E_0.eval()
+        E_1.eval()
+        E_2.eval()
         # learning rate schedule
         if (iteration + 1) % 1000 == 0:
             g_lr = max(g_lr * 0.99, 1e-5)
@@ -234,8 +249,10 @@ def main(args):
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
             #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
-            print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
-                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
+            print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} e_loss {:.3f}|{:.3f}|{:.3f} g_lr {:.8f} q_lr {:.8f}".format(
+                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), 
+                e0_lss.item(), e1_lss.item(), e2_lss.item(),
+                g_lr, q_lr))
             print(zk_pos.max(), zk_pos.min())
         if iteration % args.plot_iter == 0:
             # reconstruction
@@ -261,7 +278,9 @@ def main(args):
                 'Q_optimizer': Q_optimizer.state_dict(),
                 'Q_dummy_state_dict': Q_dummy.state_dict(),
                 'Q_eval_state_dict': Q_eval.state_dict(),
-                'E_state_dict': E.state_dict(),
+                'E0_state_dict': E_0.state_dict(),
+                'E1_state_dict': E_1.state_dict(),
+                'E2_state_dict': E_2.state_dict(),
                 'E_optimizer': E_optimizer.state_dict(),
                 'iter': iteration
             }
@@ -282,7 +301,9 @@ def main(args):
                     'Q_optimizer': Q_optimizer.state_dict(),
                     'Q_dummy_state_dict': Q_dummy.state_dict(),
                     'Q_eval_state_dict': Q_eval.state_dict(),
-                    'E_state_dict': E.state_dict(),
+                    'E0_state_dict': E_0.state_dict(),
+                    'E1_state_dict': E_1.state_dict(),
+                    'E2_state_dict': E_2.state_dict(),
                     'E_optimizer': E_optimizer.state_dict(),
                     'iter': iteration
                 }

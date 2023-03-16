@@ -47,31 +47,34 @@ def main(args):
 
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
-        # transforms.RandomHorizontalFlip(),
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    # trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-    # trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
-    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
-    train_iter = iter(trainloader)
-
-    start_time = time.time()
-    print("Begin calculating real image statistics")
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
-    testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
-    # testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test)
+    if args.dataset == 'cifar10':
+        args.nz = 128
+        args.ngf = 128
+        trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+        mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+    elif args.dataset == 'svhn':
+        args.nz = 100
+        args.ngf = 64
+        trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
+        testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test) 
+        mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
+    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
-
-    mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
-    # mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
+    train_iter = iter(trainloader)
     
     # pre-calculating statistics for fid calculation
+    start_time = time.time()
+    print("Begin calculating real image statistics")
     fid_data_true = []
     for x, _ in testloader:
         fid_data_true.append(x)
@@ -84,8 +87,10 @@ def main(args):
     fid_data_true, testset, testloader = None, None, None
 
     # define models
-    # G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
-    G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    if args.dataset == 'cifar10':
+        G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    elif args.dataset == 'svhn':
+        G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
@@ -179,7 +184,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
-    parser.add_argument('--nz', type=int, default=100, help='z vector length')
+    parser.add_argument('--nz', type=int, default=128, help='z vector length')
     parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
     parser.add_argument('--nif', type=int, default=64, help='base channel numbers in Q encoder')
     parser.add_argument('--nxemb', type=int, default=1024, help='x embedding dimension in Q')
