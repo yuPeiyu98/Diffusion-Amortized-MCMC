@@ -124,7 +124,7 @@ def sample_langevin_post_z_with_prior_nce(z, x, netG, netE, g_l_steps, g_llhd_si
         z_n = 1.0 / 2.0 * torch.sum(z**2) 
         en = 0
         for E in netE:
-            en = en - netE(z).sum()
+            en = en - E(z).sum()
         total_en = g_log_lkhd + en + z_n
         z_grad = torch.autograd.grad(total_en, z)[0]
 
