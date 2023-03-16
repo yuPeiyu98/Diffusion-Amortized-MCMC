@@ -217,7 +217,9 @@ def main(args):
         E_loss = e0_lss + e1_lss + e2_lss
         E_loss.backward()
         if args.e_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
+            torch.nn.utils.clip_grad_norm_(E_0.parameters(), max_norm=args.e_max_norm)
+            torch.nn.utils.clip_grad_norm_(E_1.parameters(), max_norm=args.e_max_norm)
+            torch.nn.utils.clip_grad_norm_(E_2.parameters(), max_norm=args.e_max_norm)
         E_optimizer.step()
 
         Q.eval()
