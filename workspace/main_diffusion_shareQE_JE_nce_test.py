@@ -18,7 +18,7 @@ import datetime as dt
 import re
 from data.dataset import CIFAR10
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_mh, sample_langevin_post_z_with_gaussian
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_nce, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid_with_diffusion_prior_E
 
 
@@ -100,11 +100,15 @@ def main(args):
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A')
 
-    E = _netE(nz=args.nz)
+    E_0 = _netE(nz=args.nz)
+    E_1 = _netE(nz=args.nz)
+    E_2 = _netE(nz=args.nz)
 
     G.cuda()
     Q.cuda()
-    E.cuda()
+    E_0.cuda()
+    E_1.cuda()
+    E_2.cuda()
     Q_dummy.cuda()
 
     start_iter = 0
@@ -118,17 +122,19 @@ def main(args):
         G.load_state_dict(state_dict['G_state_dict'])
         Q.load_state_dict(state_dict['Q_state_dict'])
         Q_dummy.load_state_dict(state_dict['Q_dummy_state_dict'])
-        E.load_state_dict(state_dict['E_state_dict'])
+        E_0.load_state_dict(state_dict['E0_state_dict'])
+        E_1.load_state_dict(state_dict['E1_state_dict'])
+        E_2.load_state_dict(state_dict['E2_state_dict'])
         
         fid_s_time = time.time()
         out_fid = calculate_fid_with_diffusion_prior(
-            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=E,
+            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=[E_0, E_1, E_2],
             real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
         print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
         fid_s_time = time.time()
         out_fid = calculate_fid_with_diffusion_prior_E(
-            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=E,
+            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=[E_0, E_1, E_2],
             real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
         print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
@@ -141,8 +147,8 @@ def main(args):
                 z0 = Q(x)
             zk_pos = z0.detach().clone()
             zk_pos.requires_grad = True
-            zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
+            zk_pos = sample_langevin_post_z_with_prior_nce(
+                            z=zk_pos, x=x, netG=G, netE=[E_0, E_1, E_2], g_l_steps=10, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
