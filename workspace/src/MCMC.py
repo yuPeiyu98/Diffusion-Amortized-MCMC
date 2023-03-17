@@ -437,7 +437,7 @@ def gen_samples_with_diffusion_prior_E(b, device, netQ, netG, netE):
     K = 10
     with torch.no_grad():
         zk_prior = netQ(x=None, b=b * K, device=device).reshape(b, K, -1)
-        logit = - 1.0 / 2.0 * torch.sum(zk_prior**2, dim=-1)
+        logit = 0
         if isinstance(netE, list):
             for E in netE:
                 logit = logit + E(z).sum()
