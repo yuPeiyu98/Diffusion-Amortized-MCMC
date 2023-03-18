@@ -439,8 +439,7 @@ def gen_samples_with_diffusion_prior_E(b, device, netQ, netG, netE):
         zk_prior = netQ(x=None, b=b * K, device=device).reshape(b, K, -1)
         logit = 0
         if isinstance(netE, list):
-            for E in netE:
-                logit = logit + E(zk_prior)
+            logit = netE[1](zk_prior) + netE[2](zk_prior)
         else:
             logit = logit - netE(zk_prior)  # (b, K)
         # i = F.gumbel_softmax(logit, dim=1, hard=True).argmax(dim=1).unsqueeze(1)
