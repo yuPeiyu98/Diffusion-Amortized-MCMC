@@ -124,7 +124,8 @@ def main(args):
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-2, lr=args.q_lr, betas=(0.5, 0.999))
     E_optimizer = optim.Adam(
-        [{'params': E_0.parameters()}, {'params': E_1.parameters()}, 
+        [{'params': E_0.parameters()}, 
+         {'params': E_1.parameters()}, 
          {'params': E_2.parameters()}], lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
