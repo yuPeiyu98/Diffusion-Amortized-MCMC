@@ -32,9 +32,9 @@ def sample_langevin_prior_nce_z(z, netE, e_l_steps, e_l_step_size, e_l_with_nois
     for i in range(e_l_steps):
         en = netE[0](z).sum() + netE[1](z).sum() + netE[2](z).sum()
         z_norm = 1.0 / 2.0 * torch.sum(z**2)
-        z_grad = torch.autograd.grad(en + z_norm, z)[0]
+        z_grad = torch.autograd.grad(en - z_norm, z)[0]
 
-        z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * z_grad 
+        z.data = z.data + 0.5 * e_l_step_size * e_l_step_size * z_grad 
         if e_l_with_noise:
             z.data += e_l_step_size * torch.randn_like(z)
 
