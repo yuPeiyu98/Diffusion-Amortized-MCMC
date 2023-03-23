@@ -91,7 +91,7 @@ def sample_langevin_post_z_with_prior(z, x, netG, netE, g_l_steps, g_llhd_sigma,
     for i in range(g_l_steps):
         x_hat = netG(z)
         g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
-        z_n = 1.0 / 2.0 * torch.sum(z**2) 
+        z_n = torch.zeros_like(z).sum() # 1.0 / 2.0 * torch.sum(z**2) 
         en = netE(z).sum()
         total_en = g_log_lkhd + en + z_n
         z_grad = torch.autograd.grad(total_en, z)[0]
