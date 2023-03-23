@@ -27,6 +27,25 @@ def sample_langevin_prior_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, v
     z.requires_grad = False
     return z.detach()
 
+def sample_langevin_prior_nce_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, verbose=False):
+    mystr = "Step/en/z_norm: "
+    for i in range(e_l_steps):
+        en = netE[0](z).sum() + netE[1](z).sum() + netE[2](z).sum()
+        z_norm = 1.0 / 2.0 * torch.sum(z**2)
+        z_grad = torch.autograd.grad(en + z_norm, z)[0]
+
+        z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * z_grad 
+        if e_l_with_noise:
+            z.data += e_l_step_size * torch.randn_like(z)
+
+        if (i % 5 == 0 or i == e_l_steps - 1):
+            mystr += "{}/{:.3f}/{:.3f}  ".format(i, en.item(), z_norm.item())
+    if verbose:
+        print("Log prior sampling.")
+        print(mystr)
+    z.requires_grad = False
+    return z.detach()
+
 def sample_langevin_post_z(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/en/z_norm/recons_loss: "
     for i in range(g_l_steps):
@@ -402,20 +421,21 @@ def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sig
     z.requires_grad = False
     return z.detach()
 
-def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
+def gen_samples_nce(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     zk_prior = torch.randn(bs, nz).cuda()
     zk_prior.requires_grad = True
-    zk_prior = sample_langevin_prior_z(z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
+    zk_prior = sample_langevin_prior_nce_z(
+        z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
     with torch.no_grad():
         x = netG(zk_prior)
     return x
 
-def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise, real_m, real_s, save_name):
+def calculate_fid_nce(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise, real_m, real_s, save_name):
     bs = 500
     fid_samples = []
         
     for i in range(n_samples // bs):
-        cur_samples = gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise)
+        cur_samples = gen_samples_nce(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise)
         fid_samples.append(cur_samples.detach().clone())
         
     fid_samples = torch.cat(fid_samples, dim=0)

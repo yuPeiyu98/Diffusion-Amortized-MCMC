@@ -19,7 +19,7 @@ import re
 from data.dataset import CIFAR10
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_nce, sample_langevin_post_z_with_gaussian
-from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid_with_diffusion_prior_E
+from src.MCMC import calculate_fid_nce, calculate_fid_with_diffusion_prior, calculate_fid_with_diffusion_prior_E
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -129,6 +129,12 @@ def main(args):
         fid_s_time = time.time()
         out_fid = calculate_fid_with_diffusion_prior(
             n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=[E_0, E_1, E_2],
+            real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
+        print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
+
+        fid_s_time = time.time()
+        out_fid = calculate_fid_nce(
+            n_samples=args.n_fid_samples, nz=args.nz, netE=[E_0, E_1, E_2], netG=G, e_l_steps=100, e_l_step_size=0.1, e_l_with_noise=True,
             real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
         print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
