@@ -81,7 +81,7 @@ class _netG_svhn(nn.Module):
         _z = z.reshape((len(z), self.nz, 1, 1))
         return self.gen(_z)
 
-class _netG_celeb64(nn.Module):
+class _netG_celeba64(nn.Module):
     def __init__(self, nz=100, ngf=128, nc=3, use_spc_norm=False):
         super().__init__()
         self.nz = nz
