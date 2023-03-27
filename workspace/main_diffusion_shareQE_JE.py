@@ -72,13 +72,13 @@ def main(args):
         args.ngf = 128
 
         transform_train = transforms.Compose([
-            transforms.Resize(64)
+            transforms.Resize(64),
             transforms.RandomHorizontalFlip(),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
         transform_test = transforms.Compose([
-            transforms.Resize(64)
+            transforms.Resize(64),
             transforms.ToTensor(),
             transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
         ])
