@@ -787,7 +787,7 @@ class _netQ_U(nn.Module):
 
         self.cond_w = cond_w
 
-    def forward(self, x=None, b=None, device=None):
+    def forward(self, x=None, b=None, device=None, cond_w=-1):
         # give x infer z
         if x is not None:
             assert b is None and device is None
@@ -807,9 +807,11 @@ class _netQ_U(nn.Module):
             logsnr_s = logsnr_schedule_fn(torch.clamp(i_tensor - 1.0, min=0.0) / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
             eps_pred = self.p(z=zt, logsnr=logsnr_t, xemb=xemb)
 
-            if x is not None and self.cond_w > 0:
-                eps_pred_unc = self.p(z=zt, logsnr=logsnr_t, xemb=torch.zeros(b, self.nxemb).to(device))
-                eps_pred = (1 + self.cond_w) * eps_pred - self.cond_w * eps_pred_unc
+            if x is not None and cond_w > 0:
+                # eps_pred_unc = self.p(z=zt, logsnr=logsnr_t, xemb=torch.zeros(b, self.nxemb).to(device))
+                xemb_unc = self.prior_emb(torch.randn(b, self.nz, device=device))
+                eps_pred_unc = self.p(z=zt, logsnr=logsnr_t, xemb=xemb_unc)
+                eps_pred = (1 + cond_w) * eps_pred - cond_w * eps_pred_unc
             
             #print('eps', i, eps_pred.max(), eps_pred.min())
             logsnr_t = logsnr_t.reshape((b, 1))
