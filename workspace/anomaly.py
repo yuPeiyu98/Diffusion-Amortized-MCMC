@@ -232,8 +232,9 @@ def main(args):
                 with torch.no_grad():
                     x_hat = G(zk_pos)
                     s_hat = E(zk_pos)
-                    score = -torch.mean((x_hat - x) ** 2, dim=[1,2,3]) * 1 - s_hat
+                    score = torch.sum((x_hat - x) ** 2, dim=[1, 2, 3]) * 1 + s_hat + torch.sum(zk_pos ** 2, dim=-1) * 0.5
                     s_list.append(score)
+                    l_list.append(l)
 
             l_arr = torch.cat(l_list, dim=0).detach().cpu().numpy()
             s_arr = torch.cat(s_list, dim=0).detach().cpu().numpy()

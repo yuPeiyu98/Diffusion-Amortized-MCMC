@@ -12,6 +12,22 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
+def adapt_labels(true_labels, label):
+    """Adapt labels to anomaly detection context
+    Args :
+            true_labels (list): list of ints
+            label (int): label which is considered anomalous
+    Returns :
+            true_labels (list): list of labels, 1 for anomalous and 0 for normal
+    """
+    if label == 0:
+        (true_labels[true_labels == label], true_labels[true_labels != label]) = (0, 1)
+        true_labels = [1] * true_labels.shape[0] - true_labels
+    else:
+        (true_labels[true_labels != label], true_labels[true_labels == label]) = (0, 1)
+
+    return true_labels
+
 class MNIST(Dataset):
     def __init__(
         self, root, split, label, transform
@@ -63,10 +79,10 @@ class MNIST(Dataset):
 
         if self.split == 'train':
             dataset['img'] = training_x_data
-            dataset['lbl'] = training_y_data
+            dataset['lbl'] = adapt_labels(training_y_data, self.held_label)
         else:
             dataset['img'] = testing_x_data
-            dataset['lbl'] = testing_y_data
+            dataset['lbl'] = adapt_labels(testing_y_data, self.held_label)
         return dataset
 
     def __len__(self):
