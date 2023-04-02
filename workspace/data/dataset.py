@@ -16,7 +16,7 @@ class MNIST(Dataset):
     def __init__(
         self, root, split, label, transform
     ):
-        super(MNISTDataset, self).__init__()        
+        super().__init__()        
         self.split = split
         self.held_label = label
         self.transform = transform
