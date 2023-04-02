@@ -94,7 +94,7 @@ def main(args):
     E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
-    auc_best = 10000
+    auc_best = 0.0
     if args.resume_path is not None:
         print('load from ', args.resume_path)
         state_dict = torch.load(args.resume_path)
@@ -241,8 +241,21 @@ def main(args):
             s_arr = torch.cat(s_list, dim=0).detach().cpu().numpy()
             precision, recall, thresholds = precision_recall_curve(l_arr, s_arr)
             prc_auc = auc(recall, precision)
-            if prc_auc < auc_best:
+            if prc_auc > auc_best:
                 auc_best = prc_auc
+                print('Saving best checkpoint')
+                save_dict = {
+                    'G_state_dict': G.state_dict(),
+                    'G_optimizer': G_optimizer.state_dict(),
+                    'Q_state_dict': Q.state_dict(),
+                    'Q_optimizer': Q_optimizer.state_dict(),
+                    'Q_dummy_state_dict': Q_dummy.state_dict(),
+                    'Q_eval_state_dict': Q_eval.state_dict(),
+                    'E_state_dict': E.state_dict(),
+                    'E_optimizer': E_optimizer.state_dict(),
+                    'iter': iteration
+                }
+                torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
             print("Finish calculating auc time {:.3f} auc {:.3f} / {:.3f}".format(time.time() - eval_time, prc_auc, auc_best))
 
 
