@@ -48,11 +48,11 @@ def main(args):
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5), (0.5))
     ])
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        transforms.Normalize((0.5), (0.5))
     ])
 
     trainset = MNIST(root=osp.join(args.data_path), split='train', label=args.label, transform=transform_train)
