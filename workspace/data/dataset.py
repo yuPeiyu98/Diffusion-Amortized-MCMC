@@ -83,6 +83,8 @@ class MNIST(Dataset):
         else:
             dataset['img'] = testing_x_data
             dataset['lbl'] = adapt_labels(testing_y_data, self.held_label)
+
+        np.save(osp.join(self.root_dir, 'heldout_{}_{}.npy'.format(self.held_label, self.split)), dataset)
         return dataset
 
     def __len__(self):
