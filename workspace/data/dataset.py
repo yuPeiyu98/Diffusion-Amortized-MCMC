@@ -12,43 +12,17 @@ from PIL import Image
 from torch.utils.data import DataLoader
 from torch.utils.data import Dataset
 
-class CIFAR10(torchvision.datasets.CIFAR10):
-    def __init__(self, **kwargs):
-        super().__init__(**kwargs)
-
-    def __getitem__(self, index: int):
-        img, target = super().__getitem__(index)
-
-        return img, index
-
-###################################################################
-#################### low-res datasets (32x32) #####################
-###################################################################
-
-class CIFAR10Dataset(Dataset):
+class MNIST(Dataset):
     def __init__(
-        self, 
-        config, 
-        data_split=0, 
-        use_flip=True
+        self, root, split, label, transform
     ):
-        super(CIFAR10Dataset, self).__init__()        
-
-        self.data_split = data_split
-        self.use_flip = use_flip
-        self.transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                (0.5, 0.5, 0.5), 
-                (0.5, 0.5, 0.5)
-            )
-        ])        
+        super(MNISTDataset, self).__init__()        
+        self.split = split
+        self.held_label = label
+        self.transform = transform
         
-        self.root_dir = config.ROOT_DIR
+        self.root_dir = root
         self.meta = self._collect_meta()
-
-        self.im_res = [16, 8]
 
     def _collect_meta(self):
         """ 
@@ -60,151 +34,43 @@ class CIFAR10Dataset(Dataset):
             'lbl': ndarray, (N,)
         }
         """
-        import pickle
+        data = dict(np.load(osp.join(self.root_dir, 'mnist.npz')))
+        dataset = {}
 
-        data_dir = self.root_dir
+        full_x_data = np.concatenate([data['x_train'], data['x_test'], data['x_valid']], axis=0)
+        full_y_data = np.concatenate([data['y_train'], data['y_test'], data['y_valid']], axis=0)
 
-        meta = {'img': None, 'lbl': None}
-        if self.data_split == 0:
-            # training split
-            for i in range(1, 6): # hard-coded for cifar-10 dataset
-                with open(
-                    osp.join(data_dir, 'data_batch_{}'.format(i)), 
-                    'rb'
-                ) as fo:
-                    data_dict = pickle.load(fo, encoding='bytes')
-                    if not isinstance(meta['img'], np.ndarray):
-                        meta['img'] = data_dict[b'data']
-                        meta['lbl'] = np.array(data_dict[b'labels'])
-                    else:
-                        meta['img'] = np.vstack([
-                            meta['img'], 
-                            data_dict[b'data']
-                        ])
-                        meta['lbl'] = np.hstack([
-                            meta['lbl'], 
-                            np.array(data_dict[b'labels'])
-                        ])
+        normal_x_data = full_x_data[full_y_data != self.held_label]
+        normal_y_data = full_y_data[full_y_data != self.held_label]
+
+        RANDOM_SEED = 42
+        RNG = np.random.RandomState(42)
+        inds = RNG.permutation(normal_x_data.shape[0])
+        normal_x_data = normal_x_data[inds]
+        normal_y_data = normal_y_data[inds]
+
+        index = int(normal_x_data.shape[0]*0.8)
+
+        training_x_data = normal_x_data[:index]
+        training_y_data = normal_y_data[:index]
+
+        testing_x_data = np.concatenate([normal_x_data[index:], full_x_data[full_y_data == self.held_label]], axis=0)
+        testing_y_data = np.concatenate([normal_y_data[index:], full_y_data[full_y_data == self.held_label]], axis=0)
+
+        inds = RNG.permutation(testing_x_data.shape[0])
+        testing_x_data = testing_x_data[inds]
+        testing_y_data = testing_y_data[inds]
+
+        if self.split == 'train':
+            dataset['img'] = training_x_data
+            dataset['lbl'] = training_y_data
         else:
-            # testing / validation split
-            with open(
-                osp.join(data_dir, 'test_batch'), 
-                'rb'
-            ) as fo:
-                data_dict = pickle.load(fo, encoding='bytes')
-                
-                meta['img'] = data_dict[b'data']
-                meta['lbl'] = np.array(data_dict[b'labels'])                
-        
-        print(
-            '{} meta: img data {}, labels {}'.format(
-                'training' if self.data_split == 0 else 'testing',
-                meta['img'].shape, 
-                meta['lbl'].shape
-            )
-        )
-        return meta
+            dataset['img'] = testing_x_data
+            dataset['lbl'] = testing_y_data
+        return dataset
 
     def __len__(self):
         return len(self.meta['img'])
-
-    def __getitem__(self, index):
-        try:
-            item = self.load_item(index)
-        except:
-            print('loading error: sample # {}'.format(index))
-            item = self.load_item(0)
-
-        return item    
-
-    def load_item(self, index):
-        data = self.meta['img'][index]
-        label = self.meta['lbl'][index]
-        
-        # reshape raw data to HxWxC format
-        data = data.reshape(3, 32, 32).transpose(1, 2, 0)
-
-        return self.transform(data), label
-
-    def create_iterator(self, batch_size):
-        while True:
-            sample_loader = DataLoader(
-                dataset=self,
-                batch_size=batch_size,
-                drop_last=True,
-                shuffle=False
-            )
-
-            for item in sample_loader:
-                yield item
-
-##### + under development
-class MNISTDataset(Dataset):
-    def __init__(
-        self, 
-        config, 
-        data_split=0, 
-        use_flip=True
-    ):
-        super(MNISTDataset, self).__init__()        
-
-        self.data_split = data_split
-        self.use_flip = use_flip
-        self.transform = transforms.Compose([
-            transforms.ToPILImage(),
-            transforms.ToTensor(),
-            transforms.Normalize(
-                (0.5, 0.5, 0.5), 
-                (0.5, 0.5, 0.5)
-            )
-        ])        
-        
-        self.root_dir = config.ROOT_DIR
-        self.meta = self._collect_meta()
-
-    def _collect_meta(self):
-        """ 
-        Returns a dictionary with image data and their labels
-        as its values.
-
-        Return: {
-            'img': ndarray, (N, 3072),
-            'lbl': ndarray, (N,)
-        }
-        """
-        import pickle
-
-        data_dir = self.root_dir
-
-        meta = {'img': None, 'lbl': None}
-        for i in range(1, 6): # hard-coded for cifar-10 dataset
-            with open(
-                osp.join(data_dir, 'data_batch_{}'.format(i)), 
-                'rb'
-            ) as fo:
-                data_dict = pickle.load(fo, encoding='bytes')
-                if meta['img'] == None:
-                    meta['img'] = data_dict[b'data']
-                    meta['lbl'] = np.array(data_dict[b'labels'])
-                else:
-                    meta['img'] = np.vstack([
-                        meta['img'], 
-                        data_dict[b'data']
-                    ])
-                    meta['lbl'] = np.hstack([
-                        meta['lbl'], 
-                        np.array(data_dict[b'labels'])
-                    ])
-        
-        print(
-            'Meta: img data {}, labels {}'.format(
-                meta['img'].shape, meta['lbl'].shape
-            )
-        )
-        return meta
-
-    def __len__(self):
-        return len(self.meta)
 
     def __getitem__(self, index):
         try:
@@ -220,22 +86,8 @@ class MNISTDataset(Dataset):
         label = self.meta['lbl'][index]
         
         # reshape raw data to HxWxC format
-        data = data.reshape(3, 32, 32).transpose(1, 2, 0)            
+        data = data.reshape(1, 28, 28).transpose(1, 2, 0)            
         # pre-process the raw image
         data = self.transform(data)
 
-        if self.use_flip and np.random.uniform() > 0.5:
-            img = torch.flip(img, dims=[-1])
         return data, label
-
-    def create_iterator(self, batch_size):
-        while True:
-            sample_loader = DataLoader(
-                dataset=self,
-                batch_size=batch_size,
-                drop_last=True,
-                shuffle=False
-            )
-
-            for item in sample_loader:
-                yield item
