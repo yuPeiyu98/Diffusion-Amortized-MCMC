@@ -109,6 +109,7 @@ def main(args):
     rho = 0.005
     p_mask = args.p_mask
 
+    start_time = time.time()
     # begin training
     for iteration in range(start_iter, args.iterations + 1):
         try:
