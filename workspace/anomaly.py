@@ -133,14 +133,15 @@ def main(args):
         with torch.no_grad():
             z0 = Q_dummy(x)
             zp = Q(x=None, b=x.size(0), device=x.device)
-        zk_pos = z0.detach().clone()
+        zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
         zk_pos.requires_grad = True
+        zk_neg.requires_grad = True
 
         zk_pos = sample_langevin_post_z_with_prior(
             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
-            z=z0.detach().clone(), netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
+            z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
         z_mask = torch.ones(len(x), device=x.device)
 
