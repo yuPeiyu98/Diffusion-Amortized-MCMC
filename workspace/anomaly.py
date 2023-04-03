@@ -18,7 +18,7 @@ import datetime as dt
 import re
 from data.dataset import MNIST
 from src.diffusion_net import _netG_mnist, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_mh, sample_langevin_post_z_with_gaussian
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
 from sklearn.metrics import roc_curve, precision_recall_curve, auc
@@ -121,10 +121,10 @@ def main(args):
         x = x.cuda()
         # print(idx)
 
-        z_mask_prob = torch.rand((len(x),), device=x.device)
-        z_mask = torch.ones(len(x), device=x.device)
-        z_mask[z_mask_prob < p_mask] = 0.0
-        z_mask = z_mask.unsqueeze(-1)
+        # z_mask_prob = torch.rand((len(x),), device=x.device)
+        # z_mask = torch.ones(len(x), device=x.device)
+        # z_mask[z_mask_prob < p_mask] = 0.0
+        # z_mask = z_mask.unsqueeze(-1)
 
         Q.eval()
         G.eval()
@@ -139,12 +139,18 @@ def main(args):
         zk_pos = sample_langevin_post_z_with_prior(
             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
-        
+        zk_neg = sample_langevin_prior_z(
+            z=z0.detach().clone(), netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
+            e_l_with_noise=args.e_l_with_noise, verbose=False)
+        z_mask = torch.ones(len(x), device=x.device)
+
         for __ in range(6):
             # update Q 
             Q_optimizer.zero_grad()
             Q.train()
-            Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
+            Q_loss_p = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
+            Q_loss_n = Q.calculate_loss(x=x, z=zk_pos, mask=1 - z_mask).mean()
+            Q_loss = Q_loss_p + Q_loss_n
             Q_loss.backward()
             if args.q_is_grad_clamp:
                 torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
@@ -164,8 +170,8 @@ def main(args):
         # update E
         E_optimizer.zero_grad()
         E.train()
-        e_pos, e_neg = E(zk_pos), E(zp)
-        E_loss = e_pos.mean() - e_neg.mean() + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4
+        e_pos, e_neg = E(zk_pos), E(zk_neg)
+        E_loss = e_pos.mean() - e_neg.mean() # + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
