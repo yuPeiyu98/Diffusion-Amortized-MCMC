@@ -30,12 +30,13 @@ def adapt_labels(true_labels, label):
 
 class MNIST(Dataset):
     def __init__(
-        self, root, split, label, transform
+        self, root, split, label, transform, load=False
     ):
         super().__init__()        
         self.split = split
         self.held_label = label
         self.transform = transform
+        self.load = load
         
         self.root_dir = root
         self.meta = self._collect_meta()
@@ -53,38 +54,45 @@ class MNIST(Dataset):
         data = dict(np.load(osp.join(self.root_dir, 'mnist.npz')))
         dataset = {}
 
-        full_x_data = np.concatenate([data['x_train'], data['x_test'], data['x_valid']], axis=0)
-        full_y_data = np.concatenate([data['y_train'], data['y_test'], data['y_valid']], axis=0)
+        if self.load:
+            dataset = np.load(
+                osp.join(self.root_dir, 'heldout_{}_{}.npy'.format(self.held_label, self.split)),
+                allow_pickle=True
+            ).item()
 
-        normal_x_data = full_x_data[full_y_data != self.held_label]
-        normal_y_data = full_y_data[full_y_data != self.held_label]
-
-        RANDOM_SEED = 42
-        RNG = np.random.RandomState(42)
-        inds = RNG.permutation(normal_x_data.shape[0])
-        normal_x_data = normal_x_data[inds]
-        normal_y_data = normal_y_data[inds]
-
-        index = int(normal_x_data.shape[0]*0.8)
-
-        training_x_data = normal_x_data[:index]
-        training_y_data = normal_y_data[:index]
-
-        testing_x_data = np.concatenate([normal_x_data[index:], full_x_data[full_y_data == self.held_label]], axis=0)
-        testing_y_data = np.concatenate([normal_y_data[index:], full_y_data[full_y_data == self.held_label]], axis=0)
-
-        inds = RNG.permutation(testing_x_data.shape[0])
-        testing_x_data = testing_x_data[inds]
-        testing_y_data = testing_y_data[inds]
-
-        if self.split == 'train':
-            dataset['img'] = training_x_data
-            dataset['lbl'] = adapt_labels(training_y_data, self.held_label)
         else:
-            dataset['img'] = testing_x_data
-            dataset['lbl'] = adapt_labels(testing_y_data, self.held_label)
+            full_x_data = np.concatenate([data['x_train'], data['x_test'], data['x_valid']], axis=0)
+            full_y_data = np.concatenate([data['y_train'], data['y_test'], data['y_valid']], axis=0)
 
-        np.save(osp.join(self.root_dir, 'heldout_{}_{}.npy'.format(self.held_label, self.split)), dataset)
+            normal_x_data = full_x_data[full_y_data != self.held_label]
+            normal_y_data = full_y_data[full_y_data != self.held_label]
+
+            RANDOM_SEED = 42
+            RNG = np.random.RandomState(42)
+            inds = RNG.permutation(normal_x_data.shape[0])
+            normal_x_data = normal_x_data[inds]
+            normal_y_data = normal_y_data[inds]
+
+            index = int(normal_x_data.shape[0]*0.8)
+
+            training_x_data = normal_x_data[:index]
+            training_y_data = normal_y_data[:index]
+
+            testing_x_data = np.concatenate([normal_x_data[index:], full_x_data[full_y_data == self.held_label]], axis=0)
+            testing_y_data = np.concatenate([normal_y_data[index:], full_y_data[full_y_data == self.held_label]], axis=0)
+
+            inds = RNG.permutation(testing_x_data.shape[0])
+            testing_x_data = testing_x_data[inds]
+            testing_y_data = testing_y_data[inds]
+
+            if self.split == 'train':
+                dataset['img'] = training_x_data
+                dataset['lbl'] = adapt_labels(training_y_data, self.held_label)
+            else:
+                dataset['img'] = testing_x_data
+                dataset['lbl'] = adapt_labels(testing_y_data, self.held_label)
+
+            np.save(osp.join(self.root_dir, 'heldout_{}_{}.npy'.format(self.held_label, self.split)), dataset)
         return dataset
 
     def __len__(self):
