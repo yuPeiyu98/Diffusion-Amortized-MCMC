@@ -421,6 +421,32 @@ def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sig
     z.requires_grad = False
     return z.detach()
 
+def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
+    zk_prior = torch.randn(bs, nz).cuda()
+    zk_prior.requires_grad = True
+    zk_prior = sample_langevin_prior_z(
+        z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
+    with torch.no_grad():
+        x = netG(zk_prior)
+    return x
+
+def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise, real_m, real_s, save_name):
+    bs = 500
+    fid_samples = []
+        
+    for i in range(n_samples // bs):
+        cur_samples = gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise)
+        fid_samples.append(cur_samples.detach().clone())
+        
+    fid_samples = torch.cat(fid_samples, dim=0)
+    fid_samples = (1.0 + torch.clamp(fid_samples, min=-1.0, max=1.0)) / 2.0
+    fid = pfw.fid(fid_samples, real_m=real_m, real_s=real_s, device="cuda:0")
+    if save_name is not None:
+        save_images = fid_samples[:64].clone().detach().cpu()
+        torchvision.utils.save_image(save_images, save_name, normalize=True, nrow=8)
+        
+    return fid
+
 def gen_samples_nce(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     zk_prior = torch.randn(bs, nz).cuda()
     zk_prior.requires_grad = True
