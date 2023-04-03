@@ -40,11 +40,11 @@ def main(args):
     timestamp = re.sub(r'[\:-]','', timestamp) # replace unwanted chars 
     timestamp = re.sub(r'[\s]','_', timestamp) # with regex and re.sub
     
-    img_dir = os.path.join(args.log_path, args.dataset, timestamp, 'imgs')
-    ckpt_dir = os.path.join(args.log_path, args.dataset, timestamp, 'ckpt')
+    img_dir = os.path.join(args.resume_path, 'imgs')
+    ckpt_dir = os.path.join(args.resume_path, 'ckpt')
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(ckpt_dir, exist_ok=True)
-    shutil.copyfile(__file__, os.path.join(args.log_path, args.dataset, timestamp, osp.basename(__file__)))
+    shutil.copyfile(__file__, os.path.join(args.resume_path, osp.basename(__file__)))
 
     # load dataset and calculate statistics
     transform_test = transforms.Compose([
@@ -107,7 +107,7 @@ def main(args):
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
         zk_pos = sample_langevin_post_z_with_prior(
-                    z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
+                    z=zk_pos, x=x, netG=G, netE=E, g_l_steps=5, # if out_fid > fid_best else 40, 
                     g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                     g_l_step_size=args.g_l_step_size, verbose=False
                 )

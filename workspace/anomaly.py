@@ -90,7 +90,7 @@ def main(args):
     Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-2, lr=args.q_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-8, lr=args.q_lr, betas=(0.5, 0.999))
     E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
@@ -165,7 +165,7 @@ def main(args):
         E_optimizer.zero_grad()
         E.train()
         e_pos, e_neg = E(zk_pos), E(zp)
-        E_loss = e_pos.mean() - e_neg.mean() + (e_pos ** 2).mean() + (e_neg ** 2).mean()
+        E_loss = e_pos.mean() - e_neg.mean() + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
