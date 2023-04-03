@@ -88,7 +88,7 @@ def main(args):
     start_iter = 0
     auc_best = 0.0
     if args.resume_path is not None:
-    	ckpt_path = os.path.join(args.resume_path, 'ckpt/best.pth.tar')
+        ckpt_path = os.path.join(args.resume_path, 'ckpt/best.pth.tar')
         print('load from ', ckpt_path)
         state_dict = torch.load(ckpt_path)
         G.load_state_dict(state_dict['G_state_dict'])
@@ -134,7 +134,7 @@ if __name__ == "__main__":
     parser.add_argument('--log_path', type=str, default='../logs/', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data/mnist', help='data path')
     parser.add_argument('--resume_path', type=str, default='../logs/mnist/20230401_192026/', 
-    									 help='pretrained ckpt path for resuming training')
+                                         help='pretrained ckpt path for resuming training')
     
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
