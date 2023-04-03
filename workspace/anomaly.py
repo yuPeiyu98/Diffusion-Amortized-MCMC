@@ -143,7 +143,7 @@ def main(args):
         zk_neg = sample_langevin_prior_z(
             z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
-        z_mask = torch.ones(len(x), device=x.device)
+        z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
 
         for __ in range(6):
             # update Q 
