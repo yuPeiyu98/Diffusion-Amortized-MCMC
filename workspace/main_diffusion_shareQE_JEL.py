@@ -17,11 +17,10 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import MNIST
-from src.diffusion_net import _netG_mnist, _netE, _netQ, _netQ_uncond, _netQ_U
+from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
 
-from sklearn.metrics import roc_curve, precision_recall_curve, auc
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -48,22 +47,71 @@ def main(args):
 
     # load dataset and calculate statistics
     transform_train = transforms.Compose([
+        transforms.RandomHorizontalFlip(),
         transforms.ToTensor(),
-        transforms.Normalize((0.5), (0.5))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
     transform_test = transforms.Compose([
         transforms.ToTensor(),
-        transforms.Normalize((0.5), (0.5))
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
     ])
+    if args.dataset == 'cifar10':
+        args.nz = 128
+        args.ngf = 128
+        trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+        testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+        mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+    elif args.dataset == 'svhn':
+        args.nz = 100
+        args.ngf = 64
+        trainset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_train)
+        testset = torchvision.datasets.SVHN(root=args.data_path, split='train', download=True, transform=transform_test) 
+        mset = torchvision.datasets.SVHN(root=args.data_path, split='test', download=True, transform=transform_test)
+    elif args.dataset == 'celeba64':
+        args.nz = 100
+        args.ngf = 128
 
-    trainset = MNIST(root=osp.join(args.data_path), split='train', label=args.label, transform=transform_train)
-    testset = MNIST(root=osp.join(args.data_path), split='test', label=args.label, transform=transform_test) 
+        transform_train = transforms.Compose([
+            transforms.Resize(64),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        transform_test = transforms.Compose([
+            transforms.Resize(64),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+
+        trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'celeba64_train'), transform=transform_train)
+        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'celeba64_train'), transform=transform_test) 
+        mset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'celeba64_test'), transform=transform_test)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
-    testloader = data.DataLoader(testset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
+    testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
+    mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
+    
+    # pre-calculating statistics for fid calculation
+    start_time = time.time()
+    print("Begin calculating real image statistics")
+    fid_data_true = []
+    for x, _ in testloader:
+        fid_data_true.append(x)
+        if len(fid_data_true) >= args.n_fid_samples:
+            break
+    fid_data_true = torch.cat(fid_data_true, dim=0)
+    fid_data_true = (fid_data_true + 1.0) / 2.0
+    real_m, real_s = pfw.get_stats(fid_data_true, device="cuda:0")
+    print("Finish calculating real image statistics {:.3f}".format(time.time() - start_time), fid_data_true.shape, fid_data_true.min(), fid_data_true.max())
+    fid_data_true, testset, testloader = None, None, None
 
     # define models
-    G = _netG_mnist(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    if args.dataset == 'cifar10':
+        G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    elif args.dataset == 'svhn':
+        G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    elif args.dataset == 'celeba64':
+        G = _netG_celeba64(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
@@ -90,11 +138,12 @@ def main(args):
     Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=0, lr=args.q_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-4, lr=args.q_lr, betas=(0.5, 0.999))
     E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
-    auc_best = 0.0
+    fid_best = 10000
+    mse_best = 10000
     if args.resume_path is not None:
         print('load from ', args.resume_path)
         state_dict = torch.load(args.resume_path)
@@ -110,7 +159,6 @@ def main(args):
     rho = 0.005
     p_mask = args.p_mask
 
-    start_time = time.time()
     # begin training
     for iteration in range(start_iter, args.iterations + 1):
         try:
@@ -144,13 +192,13 @@ def main(args):
             z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
         z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
-
+        
         for __ in range(6):
             # update Q 
             Q_optimizer.zero_grad()
             Q.train()
             Q_loss_p = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            Q_loss_n = Q.calculate_loss(x=x, z=zk_neg, mask=1 - z_mask).mean()
+            Q_loss_n = Q.calculate_loss(x=x, z=zk_pos, mask=1 - z_mask).mean()
             Q_loss = Q_loss_p + Q_loss_n
             Q_loss.backward()
             if args.q_is_grad_clamp:
@@ -172,7 +220,7 @@ def main(args):
         E_optimizer.zero_grad()
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() # + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4
+        E_loss = e_pos.mean() - e_neg.mean() # + (e_pos ** 2).mean() + (e_neg ** 2).mean()
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
@@ -198,12 +246,33 @@ def main(args):
             for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
                 target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
 
+        # for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
+        #     target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
+        # if (iteration + 1) % 1000 == 0:
+        #     # Update the frozen target models
+        #     for param, target_param in zip(Q_eval.parameters(), Q_dummy.parameters()):
+        #         target_param.data.copy_(param.data)
+
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
             #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
                 iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print(zk_pos.max(), zk_pos.min())
+        if iteration % args.plot_iter == 0:
+            # reconstruction
+            with torch.no_grad():
+                x_hat_q = G(z0)
+                save_images = x[:64].detach().cpu()
+                torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_obs.png'.format(img_dir, iteration), normalize=True, nrow=8)
+                save_images = x_hat[:64].detach().cpu()
+                torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post.png'.format(img_dir, iteration), normalize=True, nrow=8)
+                save_images = x_hat_q[:64].detach().cpu()
+                torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
+            # samples
+            samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netQ=Q, netG=G) 
+            save_images = samples[:64].detach().cpu()
+            torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
         if iteration > 0 and iteration % args.ckpt_iter == 0:
             print('Saving checkpoint')
@@ -220,36 +289,13 @@ def main(args):
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
-        if iteration % args.eval_iter == 0:
-            eval_time = time.time()
-
-            s_list = []
-            l_list = []
-            for x, l in testloader:
-                x = x.cuda()
-                with torch.no_grad():
-                    z0 = Q(x)
-                zk_pos = z0.detach().clone()
-                zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
-                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
-                            g_l_step_size=args.g_l_step_size, verbose=False
-                        )
-
-                with torch.no_grad():
-                    x_hat = G(zk_pos)
-                    s_hat = E(zk_pos)
-                    score = torch.sum((x_hat - x) ** 2, dim=[1, 2, 3]) * 1 + s_hat + torch.sum(zk_pos ** 2, dim=-1) * 0.5
-                    s_list.append(score)
-                    l_list.append(l)
-
-            l_arr = torch.cat(l_list, dim=0).detach().cpu().numpy()
-            s_arr = torch.cat(s_list, dim=0).detach().cpu().numpy()
-            precision, recall, thresholds = precision_recall_curve(l_arr, s_arr)
-            prc_auc = auc(recall, precision)
-            if prc_auc > auc_best:
-                auc_best = prc_auc
+        if iteration % args.fid_iter == 0:
+            fid_s_time = time.time()
+            out_fid = calculate_fid_with_diffusion_prior(
+                n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E,
+                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            if out_fid < fid_best:
+                fid_best = out_fid
                 print('Saving best checkpoint')
                 save_dict = {
                     'G_state_dict': G.state_dict(),
@@ -263,26 +309,52 @@ def main(args):
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
-            print("Finish calculating auc time {:.3f} auc {:.3f} / {:.3f}".format(time.time() - eval_time, prc_auc, auc_best))
+            print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
+
+            mse_lss = 0.0
+            mse_s_time = time.time()
+
+            i = 0
+            for x, _ in mloader:
+                x = x.cuda()
+                with torch.no_grad():
+                    z0 = Q(x)
+                zk_pos = z0.detach().clone()
+                zk_pos.requires_grad = True
+                zk_pos = sample_langevin_post_z_with_prior(
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
+                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            g_l_step_size=args.g_l_step_size, verbose=False
+                        )
+
+                with torch.no_grad():
+                    x_hat = G(zk_pos)
+                    g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
+                mse_lss += g_loss.item()
+
+            mse_lss /= len(mset)
+            if mse_lss < mse_best:
+                mse_best = mse_lss
+            print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1, help='random seed')
-    parser.add_argument('--dataset', type=str, default='mnist')
+    parser.add_argument('--dataset', type=str, default='svhn')
     parser.add_argument('--log_path', type=str, default='../logs/', help='log directory')
-    parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data/mnist', help='data path')
+    parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
-    parser.add_argument('--nc', type=int, default=1, help='image channel')
-    parser.add_argument('--label', type=int, default=9, help='held out digit')
+    parser.add_argument('--nc', type=int, default=3, help='image channel')
+    parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
-    parser.add_argument('--nz', type=int, default=8, help='z vector length')
+    parser.add_argument('--nz', type=int, default=128, help='z vector length')
     parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
-    parser.add_argument('--nif', type=int, default=128, help='base channel numbers in Q encoder')
+    parser.add_argument('--nif', type=int, default=64, help='base channel numbers in Q encoder')
     parser.add_argument('--nxemb', type=int, default=1024, help='x embedding dimension in Q')
     parser.add_argument('--ntemb', type=int, default=128, help='t embedding dimension in Q')
 
@@ -301,15 +373,15 @@ if __name__ == "__main__":
     parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
-    parser.add_argument('--g_llhd_sigma', type=float, default=1., help='sigma for G loss')
+    parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
     # optimizing parameters
-    parser.add_argument('--g_lr', type=float, default=1e-4, help='learning rate for generator')
-    parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
+    parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
+    parser.add_argument('--e_lr', type=float, default=1e-4, help='learning rate for latent ebm')
+    parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--e_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--g_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
@@ -319,8 +391,8 @@ if __name__ == "__main__":
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
-    parser.add_argument('--ckpt_iter', type=int, default=1000, help='number of iterations between each ckpt saving')
-    parser.add_argument('--eval_iter', type=int, default=500, help='number of iterations between each fid computation')
+    parser.add_argument('--ckpt_iter', type=int, default=50000, help='number of iterations between each ckpt saving')
+    parser.add_argument('--fid_iter', type=int, default=500, help='number of iterations between each fid computation')
 
     args = parser.parse_args()
     main(args)
