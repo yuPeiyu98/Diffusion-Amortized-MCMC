@@ -198,7 +198,7 @@ def main(args):
             Q_optimizer.zero_grad()
             Q.train()
             Q_loss_p = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            Q_loss_n = Q.calculate_loss(x=x, z=zk_pos, mask=1 - z_mask).mean()
+            Q_loss_n = Q.calculate_loss(x=x, z=zk_neg, mask=1 - z_mask).mean()
             Q_loss = Q_loss_p + Q_loss_n
             Q_loss.backward()
             if args.q_is_grad_clamp:
