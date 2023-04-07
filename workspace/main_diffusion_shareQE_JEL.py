@@ -169,10 +169,10 @@ def main(args):
         x = x.cuda()
         # print(idx)
 
-        # z_mask_prob = torch.rand((len(x),), device=x.device)
-        # z_mask = torch.ones(len(x), device=x.device)
-        # z_mask[z_mask_prob < p_mask] = 0.0
-        # z_mask = z_mask.unsqueeze(-1)
+        z_mask_prob = torch.rand((len(x),), device=x.device)
+        z_mask = torch.ones(len(x), device=x.device)
+        z_mask[z_mask_prob < p_mask] = 0.0
+        z_mask = z_mask.unsqueeze(-1)
 
         Q.eval()
         G.eval()
@@ -191,15 +191,17 @@ def main(args):
         zk_neg = sample_langevin_prior_z(
             z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
-        z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
+        # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
         
         for __ in range(6):
             # update Q 
             Q_optimizer.zero_grad()
             Q.train()
-            Q_loss_p = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            Q_loss_n = Q.calculate_loss(x=x, z=zk_neg, mask=1 - z_mask).mean()
-            Q_loss = Q_loss_p + Q_loss_n
+            # Q_loss_p = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
+            # Q_loss_n = Q.calculate_loss(x=x, z=zk_neg, mask=1 - z_mask).mean()
+            # Q_loss = Q_loss_p + Q_loss_n
+
+            Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
             Q_loss.backward()
             if args.q_is_grad_clamp:
                 torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
