@@ -147,9 +147,9 @@ def main(args):
             real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
         print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
-        fid_s_time = time.time()
-        out_fid = calculate_fid_with_diffusion_prior_E(
-            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=E,
+        out_fid = calculate_fid(
+            n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
+            e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
             real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
         print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
-    parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
+    parser.add_argument('--e_l_steps', type=int, default=100, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
 
