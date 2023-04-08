@@ -115,11 +115,11 @@ def main(args):
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset='celeba64', dataset=args.dataset)
+        net_arch='A', dataset=args.dataset)
     Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset='celeba64', dataset=args.dataset)
+        net_arch='A', dataset=args.dataset)
 
     E = _netE(nz=args.nz)
 
@@ -197,7 +197,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='cifar10')
     parser.add_argument('--log_path', type=str, default='../logs/cifar', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
-    parser.add_argument('--resume_path', type=str, default='../logs/svhn/20230304_204909/', 
+    parser.add_argument(--resume_path', type=str, default='../logs/svhn/20230304_204909/', 
                                          help='pretrained ckpt path for resuming training')
     
     # data related parameters
