@@ -197,7 +197,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='cifar10')
     parser.add_argument('--log_path', type=str, default='../logs/cifar', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
-    parser.add_argument(--resume_path', type=str, default='../logs/svhn/20230304_204909/', 
+    parser.add_argument('--resume_path', type=str, default='../logs/svhn/20230304_204909/', 
                                          help='pretrained ckpt path for resuming training')
     
     # data related parameters

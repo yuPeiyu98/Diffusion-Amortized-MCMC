@@ -479,6 +479,17 @@ def gen_samples_with_diffusion_prior(b, device, netQ, netG):
         x = netG(zk_prior)
     return x, zk_prior
 
+def gen_samples_with_diffusion_langevin_prior(b, device, netQ, netG, netE):
+    K = 10
+    with torch.no_grad():
+        zk_prior = netQ(x=None, b=b * K, device=device).reshape(b, K, -1)
+    zk_prior = sample_langevin_prior_nce_z(
+                z=zk_prior, netE=netE, 
+                e_l_steps=100, e_l_step_size=0.4, e_l_with_noise=True, verbose=False)
+    with torch.no_grad():
+        x = netG(zk_prior)
+    return x, zk_prior
+
 def gen_samples_with_diffusion_prior_E(b, device, netQ, netG, netE):
     K = 10
     with torch.no_grad():
@@ -510,6 +521,23 @@ def calculate_fid_with_diffusion_prior(n_samples, device, netQ, netG, netE, real
         save_images = fid_samples[:64].clone().detach().cpu()
         torchvision.utils.save_image(save_images, save_name, normalize=True, nrow=8)
         
+    return fid
+
+def calculate_fid_with_diffusion_langevin_prior(n_samples, device, netQ, netG, netE, real_m, real_s, save_name):
+    bs = 500
+    fid_samples = []
+        
+    for i in range(n_samples // bs):
+        cur_samples, _ = gen_samples_with_diffusion_langevin_prior(bs, device, netQ, netG, netE)
+        fid_samples.append(cur_samples.detach().clone())
+        
+    fid_samples = torch.cat(fid_samples, dim=0)
+    fid_samples = (1.0 + torch.clamp(fid_samples, min=-1.0, max=1.0)) / 2.0
+    fid = pfw.fid(fid_samples, real_m=real_m, real_s=real_s, device="cuda:0")
+    if save_name is not None:
+        save_images = fid_samples[:64].clone().detach().cpu()
+        torchvision.utils.save_image(save_images, save_name, normalize=True, nrow=8)
+
     return fid
 
 def calculate_fid_with_diffusion_prior_E(n_samples, device, netQ, netG, netE, real_m, real_s, save_name):
