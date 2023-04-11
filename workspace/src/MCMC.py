@@ -483,7 +483,7 @@ def gen_samples_with_diffusion_langevin_prior(b, device, netQ, netG, netE):
     K = 10
     with torch.no_grad():
         zk_prior = netQ(x=None, b=b * K, device=device).reshape(b, K, -1)
-    zk_prior = sample_langevin_prior_nce_z(
+    zk_prior = sample_langevin_prior_z(
                 z=zk_prior, netE=netE, 
                 e_l_steps=100, e_l_step_size=0.4, e_l_with_noise=True, verbose=False)
     with torch.no_grad():
