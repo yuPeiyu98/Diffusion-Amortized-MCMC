@@ -24,7 +24,7 @@ def sample_langevin_prior_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, v
     if verbose:
         print("Log prior sampling.")
         print(mystr)
-    z.requires_grad = False
+    # z.requires_grad = False
     return z.detach()
 
 def sample_langevin_prior_nce_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, verbose=False):
