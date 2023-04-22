@@ -39,6 +39,7 @@ class StyleGANGenerator(nn.Module):
     self.w_space_dim = getattr(self, 'w_space_dim', 512)
     self.num_mapping_layers = getattr(self, 'num_mapping_layers', 8)
     self.repeat_w = getattr(self, 'repeat_w', False)
+    self.image_channels = getattr(self, 'image_channels', 3)
     self.final_tanh = getattr(self, 'final_tanh', True)
     self.label_size = getattr(self, 'label_size', 0)
     self.fused_scale = getattr(self, 'fused_scale', 'auto')
