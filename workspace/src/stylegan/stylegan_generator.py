@@ -72,7 +72,10 @@ class StyleGANGenerator(nn.Module):
 
     if not os.path.isfile(self.weight_path):
       raise IOError('No pre-trained weights found for perceptual model!')
-    self.net.load_state_dict(torch.load(self.weight_path))
+    state_dict = torch.load(self.weight_path)
+    for var_name in self.model_specific_vars:
+      state_dict[var_name] = self.net.state_dict()[var_name]
+    self.net.load_state_dict(state_dict)
     self.net.eval()
 
   def forward(self, z, labels=None):
