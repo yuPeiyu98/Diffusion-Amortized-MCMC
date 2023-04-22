@@ -5,6 +5,7 @@
 import numpy as np
 
 import torch
+import torch.nn as nn
 
 from .stylegan_encoder_network import StyleGANEncoderNet
 

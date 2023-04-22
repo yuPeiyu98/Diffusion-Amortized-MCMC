@@ -8,6 +8,7 @@ This class is derived from the `BaseGenerator` class defined in
 import numpy as np
 
 import torch
+import torch.nn as nn
 
 from .stylegan_generator_network import StyleGANGeneratorNet
 
