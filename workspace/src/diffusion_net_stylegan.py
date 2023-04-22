@@ -1,10 +1,6 @@
 # ############################################################################
 # Include all the network structure (posterior, generator, prior) for training
 # ############################################################################
-
-import sys
-sys.path.append("..")
-
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -13,7 +9,7 @@ import numpy as np
 import math
 
 from .diffusion_helper_func import *
-from .stylegan_encoder import StyleGANEncoder
+from stylegan.stylegan_encoder import StyleGANEncoder
 
 def spectral_norm(module, mode=True):
     if mode:
