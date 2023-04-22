@@ -70,13 +70,13 @@ def main(args):
         args.nz = 7168
         args.nxemb = 7168
         args.pretrained_G_path = osp.join(args.pretrained_G_path, 'styleganinv_tower256_generator.pth')
-        args.data_path = osp.join(args.data_path, 'lsun/data')
+        args.data_path = osp.join(args.data_path, 'lsun')
         trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
         mset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
-    mloader = data.DataLoader(mset, batch_size=10, shuffle=False, num_workers=0, drop_last=False)
+    mloader = data.DataLoader(mset, batch_size=30, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
     
     # pre-calculating statistics for fid calculation
@@ -267,7 +267,7 @@ def main(args):
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_prior_p(
                             z=zk_pos, x=x, netG=G, netE=E, netF=F, 
-                            g_l_steps=10, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            g_l_steps=40, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False)
 
                 with torch.no_grad():
@@ -336,10 +336,10 @@ if __name__ == "__main__":
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
-    parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
-    parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
+    parser.add_argument('--g_l_steps', type=int, default=40, help='number of langevin steps for posterior inference')
+    parser.add_argument('--g_l_step_size', type=float, default=0.01, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
-    parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
+    parser.add_argument('--g_llhd_sigma', type=float, default=1, help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')
