@@ -19,7 +19,7 @@ import re
 from data.dataset import MNIST
 from src.stylegan.stylegan_generator import StyleGANGenerator
 from src.stylegan.perceptual_model import PerceptualModel
-from src.stylegan.diffusion_net import _netE, _netQ, _netQ_uncond, _netQ_U
+from src.diffusion_net_stylegan import _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import sample_langevin_post_z_with_prior_p, gen_samples_with_diffusion_prior, calculate_fid_with_samples
 
