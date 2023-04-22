@@ -22,8 +22,8 @@ from typing import Any, Callable, cast, List, Optional, Tuple, Union
 
 from PIL import Image
 
-from torchvision.dataset.utils import iterable_to_str, verify_str_arg
-from torchvision.dataset.vision import VisionDataset
+from torchvision.datasets.utils import iterable_to_str, verify_str_arg
+from torchvision.datasets.vision import VisionDataset
 
 
 class LSUNClass(VisionDataset):
