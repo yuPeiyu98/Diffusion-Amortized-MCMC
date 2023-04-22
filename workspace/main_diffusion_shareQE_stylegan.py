@@ -16,7 +16,7 @@ import pytorch_fid_wrapper as pfw
 import shutil
 import datetime as dt
 import re
-from data.dataset import MNIST
+from data.dataset import LSUN
 from src.stylegan.stylegan_generator import StyleGANGenerator
 from src.stylegan.perceptual_model import PerceptualModel
 from src.diffusion_net_stylegan import _netE, _netQ_uncond, _netQ_U
@@ -71,9 +71,9 @@ def main(args):
         args.nxemb = 7168
         args.pretrained_G_path = osp.join(args.pretrained_G_path, 'styleganinv_tower256_generator.pth')
         args.data_path = osp.join(args.data_path, 'lsun/data')
-        trainset = torchvision.datasets.LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
-        testset = torchvision.datasets.LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
-        mset = torchvision.datasets.LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
+        trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
+        testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
+        mset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
