@@ -87,6 +87,7 @@ class PerceptualModel(nn.Module):
 
   def __init__(self, weight_path, output_layer_idx=23, min_val=-1.0, max_val=1.0):
     """Initializes."""
+    super().__init__()
     self.output_layer_idx = output_layer_idx
     self.image_channels = 3
     self.min_val = min_val
