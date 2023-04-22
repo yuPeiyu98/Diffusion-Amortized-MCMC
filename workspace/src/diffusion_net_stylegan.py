@@ -9,7 +9,7 @@ import numpy as np
 import math
 
 from .diffusion_helper_func import *
-from stylegan.stylegan_encoder import StyleGANEncoder
+from .stylegan.stylegan_encoder import StyleGANEncoder
 
 def spectral_norm(module, mode=True):
     if mode:
