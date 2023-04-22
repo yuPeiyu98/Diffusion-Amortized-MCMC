@@ -99,15 +99,15 @@ class StyleGANGenerator(nn.Module):
     
     ls = None if labels is None else labels.float()
 
-    # Generate from Z space.
-    if z.ndim != 2 or z.shape[1] != self.z_space_dim:
-      raise ValueError(f'Latent codes should be with shape [batch_size, '
-                       f'latent_space_dim], where `latent_space_dim` equals '
-                       f'to {self.z_space_dim}!\n'
-                       f'But {z.shape} is received!')
-    ws = self.net.mapping(z, ls)
-    wps = self.net.truncation(ws)
+    # # Generate from Z space.
+    # if z.ndim != 2 or z.shape[1] != self.z_space_dim:
+    #   raise ValueError(f'Latent codes should be with shape [batch_size, '
+    #                    f'latent_space_dim], where `latent_space_dim` equals '
+    #                    f'to {self.z_space_dim}!\n'
+    #                    f'But {z.shape} is received!')
+    # ws = self.net.mapping(z, ls)
+    # wps = self.net.truncation(ws)
 
-    x = self.net.synthesis(wps)
+    x = self.net.synthesis(z)
 
     return x
