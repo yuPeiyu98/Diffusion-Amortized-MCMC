@@ -23,7 +23,6 @@ from src.diffusion_net_stylegan import _netE, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import sample_langevin_post_z_with_prior_p, gen_samples_with_diffusion_prior, calculate_fid_with_samples
 
-
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 #################### training #####################################
@@ -74,7 +73,7 @@ def main(args):
         args.data_path = osp.join(args.data_path, 'lsun/data')
         trainset = torchvision.datasets.LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = torchvision.datasets.LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
-        mset = torchvision.datasets.SVHN(root=args.data_path, classes=['tower_val'], transform=transform_test)
+        mset = torchvision.datasets.LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
@@ -305,7 +304,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1, help='random seed')
-    parser.add_argument('--dataset', type=str, default='ffhq')
+    parser.add_argument('--dataset', type=str, default='lsun_tower')
     parser.add_argument('--log_path', type=str, default='../logs/', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../../datasets/', help='data path')
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
