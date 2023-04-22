@@ -311,6 +311,8 @@ class SynthesisModule(nn.Module):
     return min(self.fmaps_base // res, self.fmaps_max)
 
   def forward(self, w):
+    w = w.reshape(-1, self.num_layers, self.w_space_dim)
+
     if w.ndim != 3 or w.shape[1:] != (self.num_layers, self.w_space_dim):
       raise ValueError(f'The input tensor should be with shape [batch_size, '
                        f'num_layers, w_space_dim], where '
