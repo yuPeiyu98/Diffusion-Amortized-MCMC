@@ -20,6 +20,7 @@ class StyleGANEncoder(nn.Module):
     self.resolution = resolution
 
     self.w_space_dim = getattr(self, 'w_space_dim', 512)
+    self.image_channels = getattr(self, 'image_channels', 3)
     self.encoder_channels_base = getattr(self, 'encoder_channels_base', 64)
     self.encoder_channels_max = getattr(self, 'encoder_channels_max', 1024)
     self.use_wscale = getattr(self, 'use_wscale', False)
