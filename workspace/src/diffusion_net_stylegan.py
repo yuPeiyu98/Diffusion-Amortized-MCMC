@@ -245,7 +245,7 @@ class Diffusion_UnetA(nn.Module):
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb)
+            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb)
         ])
 
     def input_emb(self, x):
