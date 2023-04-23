@@ -76,9 +76,9 @@ def main(args):
         trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
         mset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
-    trainloader = data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
+    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
-    mloader = data.DataLoader(mset, batch_size=batch_size, shuffle=False, num_workers=0, drop_last=False)
+    mloader = data.DataLoader(mset, batch_size=args.batch_size, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
     
     # pre-calculating statistics for fid calculation
