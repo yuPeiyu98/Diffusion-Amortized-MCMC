@@ -21,7 +21,7 @@ from src.stylegan.stylegan_generator import StyleGANGenerator
 from src.stylegan.perceptual_model import PerceptualModel
 from src.diffusion_net_stylegan import _netE, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
-from src.MCMC import sample_invert_z, gen_samples_with_diffusion_prior, calculate_fid_with_samples
+from src.MCMC import sample_invert_z, gen_samples_with_diffusion_prior_stylegan, calculate_fid_with_samples
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -76,7 +76,7 @@ def main(args):
         trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
         mset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
-    trainloader = data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=0, drop_last=True)
+    trainloader = data.DataLoader(trainset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     mloader = data.DataLoader(mset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
@@ -100,18 +100,6 @@ def main(args):
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
-    Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, \
-        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
-        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
-    Q_eval = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, \
-        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
-        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
-    for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-        target_param.data.copy_(param.data)
-    for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
-        target_param.data.copy_(param.data)
 
     E = _netE(nz=args.nz)
     F = PerceptualModel(weight_path=args.pretrained_F_path)
@@ -119,8 +107,6 @@ def main(args):
     G.cuda()
     Q.cuda()
     E.cuda()
-    Q_dummy.cuda()
-    Q_eval.cuda()
     F.cuda()
 
     Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.9, 0.999))
@@ -163,49 +149,49 @@ def main(args):
         E.eval()
         # infer z from given x
         with torch.no_grad():
-            z0 = Q_dummy(x)
-            zp = Q(x=None, b=x.size(0), device=x.device)
+            __, z0 = Q(x)
         zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_prior_p(
-            z=zk_pos, x=x, netG=G, netE=E, netF=F, 
-            g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
-            g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
+        zk_pos = sample_invert_z(
+            z=zk_pos, x=x, netG=G, netF=F, 
+            g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
             z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
-        # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
         
-        for __ in range(6):
-            # update Q 
-            Q_optimizer.zero_grad()
-            Q.train()
-
-            Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            Q_loss.backward()
-            if args.q_is_grad_clamp:
-                torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
-            Q_optimizer.step()
+        # Q grad. cumul.
+        Q.train()
+        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean() / args.batch_size
+        Q_loss.backward()
+        if args.q_is_grad_clamp:
+            torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
         
-        # update G
-        with torch.no_grad():
-            x_hat = G(zk_pos)
-            g_loss = torch.mean((x_hat - x) ** 2)
-
-        # update E
-        E_optimizer.zero_grad()
+        # E grad. cumul.
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() # + (e_pos ** 2).mean() + (e_neg ** 2).mean()
+        E_loss = (e_pos.mean() - e_neg.mean()) / args.batch_size
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
-        E_optimizer.step()
 
+        # check G
+        with torch.no_grad():
+            x_hat = G(zk_pos)
+            g_loss = torch.mean((x_hat - x) ** 2)
+        
+        # update Q & E 
+        if (iteration + 1) % args.batch_size == 0:
+            Q_optimizer.step()
+            Q_optimizer.zero_grad()
+        
+            E_optimizer.step()
+            E_optimizer.zero_grad()        
+        
         Q.eval()
         E.eval()
+
         # learning rate schedule
         if (iteration + 1) % 1000 == 0:
             q_lr = max(q_lr * 0.99, 1e-5)
@@ -215,14 +201,7 @@ def main(args):
             for E_param_group in E_optimizer.param_groups:
                 E_param_group['lr'] = e_lr
 
-        if (iteration + 1) % 10 == 0:
-            # Update the frozen target models
-            for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-
         if iteration % args.print_iter == 0:
-            # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
-            #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} e_loss {:.3f} e_pos {:.3f} e_neg {:.3f} q_lr {:.8f}".format(
                 iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), 
                 E_loss.item(), e_pos.mean().item(), e_neg.mean().item(), q_lr))
@@ -238,7 +217,7 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netQ=Q, netG=G) 
+            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=1, device=z0.device, netQ=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -247,8 +226,6 @@ def main(args):
             save_dict = {
                 'Q_state_dict': Q.state_dict(),
                 'Q_optimizer': Q_optimizer.state_dict(),
-                'Q_dummy_state_dict': Q_dummy.state_dict(),
-                'Q_eval_state_dict': Q_eval.state_dict(),
                 'E_state_dict': E.state_dict(),
                 'E_optimizer': E_optimizer.state_dict(),
                 'iter': iteration
@@ -265,17 +242,17 @@ def main(args):
             for x, _ in mloader:
                 x = x.cuda()
                 with torch.no_grad():
-                    z0 = Q(x)
+                    __, z0 = Q(x)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_prior_p(
-                            z=zk_pos, x=x, netG=G, netE=E, netF=F, 
-                            g_l_steps=100, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
-                            g_l_step_size=args.g_l_step_size, verbose=False)
+                zk_pos = sample_invert_z(
+                            z=zk_pos, x=x, netG=G, netF=F, 
+                            g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, 
+                            verbose = False)
 
                 with torch.no_grad():
                     x_hat = G(zk_pos)
-                    g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
+                    g_loss = torch.mean((x_hat - x) ** 2)
                 mse_lss += g_loss.item()
 
                 samples.append(x_hat.detach().clone())
@@ -295,8 +272,6 @@ def main(args):
                 save_dict = {
                     'Q_state_dict': Q.state_dict(),
                     'Q_optimizer': Q_optimizer.state_dict(),
-                    'Q_dummy_state_dict': Q_dummy.state_dict(),
-                    'Q_eval_state_dict': Q_eval.state_dict(),
                     'E_state_dict': E.state_dict(),
                     'E_optimizer': E_optimizer.state_dict(),
                     'iter': iteration
@@ -341,7 +316,7 @@ if __name__ == "__main__":
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
-    parser.add_argument('--g_l_steps', type=int, default=40, help='number of langevin steps for posterior inference')
+    parser.add_argument('--g_l_steps', type=int, default=100, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.01, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=False, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=1, help='sigma for G loss')
@@ -351,7 +326,7 @@ if __name__ == "__main__":
 
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
-    parser.add_argument('--e_lr', type=float, default=0, help='learning rate for latent ebm')
+    parser.add_argument('--e_lr', type=float, default=5e-4, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--e_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')

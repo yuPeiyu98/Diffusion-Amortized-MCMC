@@ -122,30 +122,34 @@ def sample_langevin_post_z_with_prior(z, x, netG, netE, g_l_steps, g_llhd_sigma,
         print(mystr)
     return z.detach()
 
-def sample_invert_z(z, x, netG, netF, g_l_steps, g_l_step_size, verbose = False):
+def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = False):
     mystr = "Step/recon_loss/feat_loss: "
 
     set_requires_grad(netG, requires_grad=False)
     set_requires_grad(netF, requires_grad=False)
+    set_requires_grad(netE, requires_grad=False)
 
     optimizer = torch.optim.Adam([z], lr=g_l_step_size)
 
     for i in range(g_l_steps):
         x_hat = netG(z)
+        en = netE(z).sum()
         g_log_lkhd = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
         f_l = torch.mean((netF(x) - netF(x_hat)) ** 2, dim=[1,2,3]).sum() 
-        total_en = g_log_lkhd + f_l * 5e-5
+        total_en = g_log_lkhd + f_l * 5e-5 + en * 5e-5
 
         optimizer.zero_grad()
         total_en.backward()
         optimizer.step()
 
-        mystr += "{}/{:.3f}/{:.3f} ".format(
-            i, g_log_lkhd.item(), f_l.item())
+        mystr += "{}/{:.3f}/{:.3f}/{:.3f} ".format(
+            i, g_log_lkhd.item(), f_l.item(), en.item())
 
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
+
+    set_requires_grad(netE, requires_grad=True)
     return z.detach()
 
 def sample_langevin_post_z_with_prior_test(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):

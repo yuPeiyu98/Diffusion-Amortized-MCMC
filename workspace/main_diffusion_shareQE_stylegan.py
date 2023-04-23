@@ -76,9 +76,9 @@ def main(args):
         trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
         mset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
-    trainloader = data.DataLoader(trainset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
+    trainloader = data.DataLoader(trainset, batch_size=batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
-    mloader = data.DataLoader(mset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
+    mloader = data.DataLoader(mset, batch_size=batch_size, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
     
     # pre-calculating statistics for fid calculation
@@ -155,7 +155,7 @@ def main(args):
         zk_neg.requires_grad = True
 
         zk_pos = sample_invert_z(
-            z=zk_pos, x=x, netG=G, netF=F, 
+            z=zk_pos, x=x, netG=G, netF=F, netE=E,
             g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
             z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
@@ -163,7 +163,7 @@ def main(args):
         
         # Q grad. cumul.
         Q.train()
-        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean() / args.batch_size
+        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
         Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
@@ -171,7 +171,7 @@ def main(args):
         # E grad. cumul.
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = (e_pos.mean() - e_neg.mean()) / args.batch_size
+        E_loss = (e_pos.mean() - e_neg.mean())
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
@@ -182,12 +182,11 @@ def main(args):
             g_loss = torch.mean((x_hat - x) ** 2)
         
         # update Q & E 
-        if (iteration + 1) % args.batch_size == 0:
-            Q_optimizer.step()
-            Q_optimizer.zero_grad()
+        Q_optimizer.step()
+        Q_optimizer.zero_grad()
         
-            E_optimizer.step()
-            E_optimizer.zero_grad()        
+        E_optimizer.step()
+        E_optimizer.zero_grad()        
         
         Q.eval()
         E.eval()
@@ -217,7 +216,7 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=1, device=z0.device, netQ=Q, netG=G) 
+            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=64, device=z0.device, netQ=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -242,11 +241,11 @@ def main(args):
             for x, _ in mloader:
                 x = x.cuda()
                 with torch.no_grad():
-                    __, z0 = Q(x)
-                zk_pos = z0.detach().clone()
+                    zk, z0 = Q(x)
+                zk_pos = zk.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_invert_z(
-                            z=zk_pos, x=x, netG=G, netF=F, 
+                            z=zk_pos, x=x, netG=G, netF=F, netE=E,
                             g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, 
                             verbose = False)
 
