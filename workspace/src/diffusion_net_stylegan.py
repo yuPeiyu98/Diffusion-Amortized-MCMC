@@ -18,7 +18,7 @@ def spectral_norm(module, mode=True):
 
 ############ Latent EBM ##################
 class _netE(nn.Module):
-    def __init__(self, nz=128, ndf=200, nez=1, e_sn=False):
+    def __init__(self, nz=128, ndf=512, nez=1, e_sn=False):
         super().__init__()
         apply_sn = sn if e_sn else lambda x: x
         f = nn.LeakyReLU(0.2)
@@ -226,9 +226,9 @@ class Diffusion_UnetA(nn.Module):
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(128, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz * 2, 512, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(512, 1024, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024, 1024, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),           
         ])
@@ -236,16 +236,16 @@ class Diffusion_UnetA(nn.Module):
 
         # self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
         self.mid_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024, 1024, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)
         ])
 
         self.out_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(2048, 1024, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(512, 128, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, nz, nxemb, ntemb)
+            ConcatSquashLinearSkipCtx(2048, 512, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024, nz, nxemb, ntemb)
         ])
 
     def input_emb(self, x):
@@ -310,7 +310,8 @@ class _netQ_U(nn.Module):
         with_noise=False, 
         cond_w=0,
         net_arch='A',
-        dataset='cifar10'
+        dataset='cifar10',
+        weight_path=None
     ):
 
         super().__init__()
@@ -323,7 +324,8 @@ class _netQ_U(nn.Module):
         self.nxemb = nxemb
         self.with_noise = with_noise
         
-        self.encoder = StyleGANEncoder()
+        self.encoder = StyleGANEncoder(weight_path=weight_path)
+        self.encoder.eval()
 
         if net_arch == 'vanilla':
             self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
@@ -348,14 +350,16 @@ class _netQ_U(nn.Module):
         if x is not None:
             assert b is None and device is None
             b = len(x)
-            xemb = self.encoder(x)
+            with torch.no_grad():
+                self.encoder.eval()
+                xemb = self.encoder(x)
             device = x.device
         else:
             # xemb = torch.zeros(b, self.nxemb).to(device)
             # xemb = self.xemb.expand(b, -1)
             xemb = self.prior_emb(torch.randn(b, self.nz, device=device))
 
-        zt = torch.randn(b, self.nz).to(device)
+        zt = torch.randn(b, self.nz).to(device) + xemb
         #print('zt', zt.max(), zt.min())
         for i in reversed(range(0, self.n_interval)):
             i_tensor = torch.ones(b, dtype=torch.float).to(device) * float(i)
@@ -394,7 +398,9 @@ class _netQ_U(nn.Module):
         #assert len(x) == len(z)
         assert z is not None
         if x is not None: 
-            xemb = self.encoder(x)
+            with torch.no_grad():
+                self.encoder.eval()
+                xemb = self.encoder(x)
             if mask is not None:
                 # xemb = xemb * mask
                 # xemb = xemb * mask + self.xemb.expand(len(x), -1) * (1 - mask)

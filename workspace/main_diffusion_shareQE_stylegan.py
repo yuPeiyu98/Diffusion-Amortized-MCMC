@@ -62,6 +62,7 @@ def main(args):
         args.nz = 7168
         args.nxemb = 7168
         args.pretrained_G_path = osp.join(args.pretrained_G_path, 'styleganinv_ffhq256_generator.pth')
+        args.pretrained_E_path = osp.join(args.pretrained_E_path, 'styleganinv_ffhq256_encoder.pth')
         args.data_path = osp.join(args.data_path, 'ffhq')
         trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'ffhq_train'), transform=transform_train)
         testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'ffhq_test'), transform=transform_test) 
@@ -70,6 +71,7 @@ def main(args):
         args.nz = 7168
         args.nxemb = 7168
         args.pretrained_G_path = osp.join(args.pretrained_G_path, 'styleganinv_tower256_generator.pth')
+        args.pretrained_E_path = osp.join(args.pretrained_E_path, 'styleganinv_tower256_encoder.pth')
         args.data_path = osp.join(args.data_path, 'lsun')
         trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
@@ -97,15 +99,15 @@ def main(args):
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset=args.dataset)
+        net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
     Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset=args.dataset)
+        net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
     Q_eval = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset=args.dataset)
+        net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
         target_param.data.copy_(param.data)
     for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
@@ -121,8 +123,8 @@ def main(args):
     Q_eval.cuda()
     F.cuda()
 
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-4, lr=args.q_lr, betas=(0.5, 0.999))
-    E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.9, 0.999))
+    E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.9, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -221,8 +223,9 @@ def main(args):
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
             #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
-            print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} q_lr {:.8f}".format(
-                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), q_lr))
+            print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} e_loss {:.3f} e_pos {:.3f} e_neg {:.3f} q_lr {:.8f}".format(
+                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), 
+                E_loss.item(), e_pos.mean().item(), e_neg.mean().item(), q_lr))
             print(zk_pos.max(), zk_pos.min())
         if iteration % args.plot_iter == 0:
             # reconstruction
@@ -310,6 +313,8 @@ if __name__ == "__main__":
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     parser.add_argument('--pretrained_G_path', type=str, default='../../idinvert/', 
                                                          help='pretrained ckpt path for generator')
+    parser.add_argument('--pretrained_E_path', type=str, default='../../idinvert/', 
+                                                         help='pretrained ckpt path for generator')
     parser.add_argument('--pretrained_F_path', type=str, default='../../idinvert/vgg16.pth', 
                                                          help='pretrained ckpt path for perceptual model')
     
@@ -346,8 +351,8 @@ if __name__ == "__main__":
 
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
-    parser.add_argument('--e_lr', type=float, default=1e-4, help='learning rate for latent ebm')
-    parser.add_argument('--q_lr', type=float, default=2e-4, help='learning rate for inference model Q')
+    parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
+    parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--e_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--g_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
@@ -355,10 +360,10 @@ if __name__ == "__main__":
     parser.add_argument('--e_max_norm', type=float, default=100, help='max norm allowed')
     parser.add_argument('--g_max_norm', type=float, default=100, help='max norm allowed')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
-    parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
+    parser.add_argument('--print_iter', type=int, default=1, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
-    parser.add_argument('--ckpt_iter', type=int, default=50000, help='number of iterations between each ckpt saving')
-    parser.add_argument('--fid_iter', type=int, default=500, help='number of iterations between each fid computation')
+    parser.add_argument('--ckpt_iter', type=int, default=100, help='number of iterations between each ckpt saving')
+    parser.add_argument('--fid_iter', type=int, default=15, help='number of iterations between each fid computation')
 
     args = parser.parse_args()
     main(args)

@@ -151,16 +151,16 @@ class BatchNormLayer(nn.Module):
       epsilon: A value added to the denominator for numerical stability.
     """
     super().__init__()
-    # self.bn = nn.BatchNorm2d(num_features=channels,
-    #                          affine=True,
-    #                          track_running_stats=True,
-    #                          momentum=1 - decay,
-    #                          eps=epsilon)
-    # self.bn.weight.requires_grad = gamma
-    # self.bn.bias.requires_grad = beta
+    self.bn = nn.BatchNorm2d(num_features=channels,
+                             affine=True,
+                             track_running_stats=True,
+                             momentum=1 - decay,
+                             eps=epsilon)
+    self.bn.weight.requires_grad = gamma
+    self.bn.bias.requires_grad = beta
 
-    self.bn = nn.InstanceNorm2d(num_features=channels,
-                                affine=True)
+    # self.bn = nn.InstanceNorm2d(num_features=channels,
+    #                             affine=True)
 
   def forward(self, x):
     return self.bn(x)
