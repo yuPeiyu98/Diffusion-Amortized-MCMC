@@ -45,6 +45,6 @@ class StyleGANEncoder(nn.Module):
     self.net.eval()
 
   def forward(self, x):
-    codes = self.net(x).reshape(x.size(0), -1)
+    codes = self.net(x)
     assert codes.shape == (x.shape[0], np.prod(self.encode_dim))
     return codes
