@@ -152,7 +152,7 @@ def sample_langevin_post_z_with_prior_p(z, x, netG, netE, netF, g_l_steps, g_llh
             z.data += g_l_step_size * torch.randn_like(z)
         mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}  ".format(
             i, en.item(), g_log_lkhd.item(), 
-            z_n.item(), z_grad.mean().item())
+            z_n.item(), 0) # z_grad.mean().item())
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
