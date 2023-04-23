@@ -226,9 +226,9 @@ class Diffusion_UnetA(nn.Module):
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz * 2, 1024, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024, 1024, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024, 1024, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),           
         ])
@@ -236,16 +236,16 @@ class Diffusion_UnetA(nn.Module):
 
         # self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
         self.mid_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024, 1024, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)
         ])
 
         self.out_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024 * 2, 1024, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb)
+            ConcatSquashLinearSkipCtx(1024 * 2, 1024, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(1024 * 2, nz, nxemb, ntemb)
         ])
 
     def input_emb(self, x):
