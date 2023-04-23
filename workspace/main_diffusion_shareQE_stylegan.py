@@ -251,7 +251,7 @@ def main(args):
 
                 with torch.no_grad():
                     x_hat = G(zk_pos)
-                    g_loss = torch.mean((x_hat - x) ** 2)
+                    g_loss = torch.mean((x_hat - x) ** 2, dim=[1, 2, 3]).sum()
                 mse_lss += g_loss.item()
 
                 samples.append(x_hat.detach().clone())
