@@ -108,7 +108,8 @@ class StyleGANGenerator(nn.Module):
     # ws = self.net.mapping(z, ls)
     # wps = self.net.truncation(ws)
 
-    z = z.view(1, *[self.num_layers, self.w_space_dim])
+    b = z.size(0)
+    z = z.view(b, *[self.num_layers, self.w_space_dim])
     x = self.net.synthesis(z)
 
     return x
