@@ -392,7 +392,7 @@ class _netQ_U(nn.Module):
                 else:
                     zt = z_s_dist['mean']
 
-        return zt + xemb
+        return xemb
         
     def calculate_loss(self, x=None, z=None, mask=None):
         # given inferred x and z train diffusion model

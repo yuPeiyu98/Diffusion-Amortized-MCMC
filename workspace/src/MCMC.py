@@ -129,18 +129,25 @@ def sample_langevin_post_z_with_prior_p(z, x, netG, netE, netF, g_l_steps, g_llh
     set_requires_grad(netE, requires_grad=False)
     set_requires_grad(netF, requires_grad=False)
 
+    optimizer = torch.optim.Adam([z], lr=g_l_step_size)
+
     for i in range(g_l_steps):
         x_hat = netG(z)
-        g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
+        g_log_lkhd = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
         z_n = 1.0 / 2.0 * torch.mean(z**2, dim=-1).sum()
         en = netE(z).sum()
         f_l = torch.mean((netF(x) - netF(x_hat)) ** 2, dim=[1,2,3]).sum() * 5e-5
-        total_en = g_log_lkhd + (en + z_n) * 1e-8 + f_l
-        z_grad = torch.autograd.grad(total_en, z)[0]
+        # total_en = g_log_lkhd + (en + z_n) * 1e-8 + f_l
+        total_en = g_log_lkhd + f_l
+        # z_grad = torch.autograd.grad(total_en, z)[0]
 
         # z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
-        z.data = z.data - g_l_step_size * z_grad
-        
+        # z.data = z.data - g_l_step_size * z_grad
+
+        optimizer.zero_grad()
+        total_en.backward()
+        optimizer.step()
+
         if g_l_with_noise:
             z.data += g_l_step_size * torch.randn_like(z)
         mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}  ".format(
