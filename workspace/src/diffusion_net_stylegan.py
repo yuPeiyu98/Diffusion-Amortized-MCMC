@@ -40,7 +40,7 @@ class _netE(nn.Module):
 
 class ConcatSquashLinearSkipCtx(nn.Module):
     # def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
-    def __init__(self, dim_in, dim_out, nxemb, ntemb, use_spc_norm=True):
+    def __init__(self, dim_in, dim_out, nxemb, ntemb, use_spc_norm=False):
         super(ConcatSquashLinearSkipCtx, self).__init__()
         self._layer = nn.Sequential(
             spectral_norm(
