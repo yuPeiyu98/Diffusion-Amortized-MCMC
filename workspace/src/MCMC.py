@@ -520,6 +520,12 @@ def gen_samples_with_diffusion_prior(b, device, netQ, netG):
         x = netG(zk_prior)
     return x, zk_prior
 
+def gen_samples_with_diffusion_prior_stylegan(b, device, netQ, netG):
+    with torch.no_grad():
+        zk_prior, __ = netQ(x=None, b=b, device=device)
+        x = netG(zk_prior)
+    return x, zk_prior
+
 def gen_samples_with_diffusion_langevin_prior(b, device, netQ, netG, netE):
     K = 10
     with torch.no_grad():

@@ -21,7 +21,7 @@ from src.stylegan.stylegan_generator import StyleGANGenerator
 from src.stylegan.perceptual_model import PerceptualModel
 from src.diffusion_net_stylegan import _netE, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
-from src.MCMC import sample_invert_z, gen_samples_with_diffusion_prior, calculate_fid_with_samples
+from src.MCMC import sample_invert_z, gen_samples_with_diffusion_prior_stylegan, calculate_fid_with_samples
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
@@ -76,7 +76,7 @@ def main(args):
         trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
         mset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
-    trainloader = data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=0, drop_last=True)
+    trainloader = data.DataLoader(trainset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     mloader = data.DataLoader(mset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
@@ -182,7 +182,7 @@ def main(args):
             g_loss = torch.mean((x_hat - x) ** 2)
         
         # update Q & E 
-        if (iteration + 1) % batch_size == 0
+        if (iteration + 1) % args.batch_size == 0:
             Q_optimizer.step()
             Q_optimizer.zero_grad()
         
@@ -217,7 +217,7 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            samples, _ = gen_samples_with_diffusion_prior(b=1, device=z0.device, netQ=Q, netG=G) 
+            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=1, device=z0.device, netQ=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -316,7 +316,7 @@ if __name__ == "__main__":
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
-    parser.add_argument('--g_l_steps', type=int, default=40, help='number of langevin steps for posterior inference')
+    parser.add_argument('--g_l_steps', type=int, default=100, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.01, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=False, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=1, help='sigma for G loss')
@@ -326,7 +326,7 @@ if __name__ == "__main__":
 
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
-    parser.add_argument('--e_lr', type=float, default=0, help='learning rate for latent ebm')
+    parser.add_argument('--e_lr', type=float, default=5e-4, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--e_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
