@@ -40,7 +40,7 @@ class _netE(nn.Module):
 
 class ConcatSquashLinearSkipCtx(nn.Module):
     # def __init__(self, dim_in, dim_out, dim_ctx, use_spc_norm=False):
-    def __init__(self, dim_in, dim_out, nxemb, ntemb, use_spc_norm=False):
+    def __init__(self, dim_in, dim_out, nxemb, ntemb, use_spc_norm=True):
         super(ConcatSquashLinearSkipCtx, self).__init__()
         self._layer = nn.Sequential(
             spectral_norm(
@@ -226,9 +226,9 @@ class Diffusion_UnetA(nn.Module):
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 2, 512, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(512, 1024, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(1024, 1024, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),           
         ])
@@ -236,16 +236,16 @@ class Diffusion_UnetA(nn.Module):
 
         # self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
         self.mid_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(1024, 1024, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)
         ])
 
         self.out_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(2048, 1024, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(2048, 512, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(1024, nz, nxemb, ntemb)
+            ConcatSquashLinearSkipCtx(nz * 2, nz, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz, nz, nxemb, ntemb)
         ])
 
     def input_emb(self, x):
@@ -359,7 +359,8 @@ class _netQ_U(nn.Module):
             # xemb = self.xemb.expand(b, -1)
             xemb = self.prior_emb(torch.randn(b, self.nz, device=device))
 
-        zt = torch.randn(b, self.nz).to(device) + xemb
+        zt = torch.randn(b, self.nz).to(device)
+
         #print('zt', zt.max(), zt.min())
         for i in reversed(range(0, self.n_interval)):
             i_tensor = torch.ones(b, dtype=torch.float).to(device) * float(i)
@@ -391,7 +392,7 @@ class _netQ_U(nn.Module):
                 else:
                     zt = z_s_dist['mean']
 
-        return zt   
+        return zt + xemb
         
     def calculate_loss(self, x=None, z=None, mask=None):
         # given inferred x and z train diffusion model
