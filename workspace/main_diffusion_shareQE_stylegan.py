@@ -171,7 +171,7 @@ def main(args):
         # E grad. cumul.
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = (e_pos.mean() - e_neg.mean())
+        E_loss = (e_pos.mean() - e_neg.mean()) + (e_pos ** 2).mean() + (e_neg ** 2).mean()
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
