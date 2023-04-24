@@ -155,7 +155,7 @@ def main(args):
         zk_neg.requires_grad = True
 
         zk_pos = sample_invert_z(
-            z=zk_pos, x=x, netG=G, netF=F, 
+            z=zk_pos, x=x, netG=G, netF=F, netE=E,
             g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
             z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
