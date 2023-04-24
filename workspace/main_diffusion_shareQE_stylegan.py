@@ -101,7 +101,7 @@ def main(args):
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
 
-    E = _netE(nz=args.nz)
+    E = _netE(nz=args.nz, e_sn=True)
     F = PerceptualModel(weight_path=args.pretrained_F_path)
 
     G.cuda()

@@ -133,9 +133,9 @@ def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = 
 
     for i in range(g_l_steps):
         x_hat = netG(z)
-        en = netE(z).sum() + torch.mean(z ** 2, dim=-1).sum()
-        g_log_lkhd = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
-        f_l = torch.mean((netF(x) - netF(x_hat)) ** 2, dim=[1,2,3]).sum() 
+        en = netE(z).sum() + 0.5 * torch.mean(z ** 2, dim=-1).sum()
+        g_log_lkhd = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).sum()
+        f_l = torch.sum((netF(x) - netF(x_hat)) ** 2, dim=[1,2,3]).sum() 
         total_en = g_log_lkhd + f_l * 5e-5 + en * 1e-8
 
         optimizer.zero_grad()
