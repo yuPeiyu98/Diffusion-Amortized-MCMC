@@ -352,5 +352,4 @@ class LastBlock(nn.Module):
     x = x.view(x.shape[0], -1)
     x = self.fc(x) * self.scale
     x = x.view(x.shape[0], x.shape[1], 1, 1)
-    # return self.bn(x).view(x.shape[0], x.shape[1])
-    return x.view(x.shape[0], x.shape[1])
+    return self.bn(x).view(x.shape[0], x.shape[1])

@@ -76,9 +76,9 @@ def main(args):
         trainset = LSUN(root=args.data_path, classes=['tower_train'], transform=transform_train)
         testset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test) 
         mset = LSUN(root=args.data_path, classes=['tower_val'], transform=transform_test)
-    trainloader = data.DataLoader(trainset, batch_size=1, shuffle=True, num_workers=0, drop_last=False)
+    trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
-    mloader = data.DataLoader(mset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
+    mloader = data.DataLoader(mset, batch_size=args.batch_size, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
     
     # pre-calculating statistics for fid calculation
@@ -101,7 +101,7 @@ def main(args):
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
 
-    E = _netE(nz=args.nz)
+    E = _netE(nz=args.nz, e_sn=False)
     F = PerceptualModel(weight_path=args.pretrained_F_path)
 
     G.cuda()
@@ -163,7 +163,7 @@ def main(args):
         
         # Q grad. cumul.
         Q.train()
-        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean() / args.batch_size
+        Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
         Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
@@ -171,7 +171,7 @@ def main(args):
         # E grad. cumul.
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = (e_pos.mean() - e_neg.mean() + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4) / args.batch_size
+        E_loss = (e_pos.mean() - e_neg.mean()) + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
@@ -182,12 +182,11 @@ def main(args):
             g_loss = torch.mean((x_hat - x) ** 2)
         
         # update Q & E 
-        if (iteration + 1) % args.batch_size == 0:
-            Q_optimizer.step()
-            Q_optimizer.zero_grad()
+        Q_optimizer.step()
+        Q_optimizer.zero_grad()
         
-            E_optimizer.step()
-            E_optimizer.zero_grad()        
+        E_optimizer.step()
+        E_optimizer.zero_grad()        
         
         Q.eval()
         E.eval()
@@ -217,7 +216,7 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=1, device=z0.device, netQ=Q, netG=G) 
+            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=64, device=z0.device, netQ=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -246,13 +245,13 @@ def main(args):
                 zk_pos = zk.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_invert_z(
-                            z=zk_pos, x=x, netG=G, netF=F, netE=E, 
+                            z=zk_pos, x=x, netG=G, netF=F, netE=E,
                             g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, 
                             verbose = False)
 
                 with torch.no_grad():
                     x_hat = G(zk_pos)
-                    g_loss = torch.mean((x_hat - x) ** 2)
+                    g_loss = torch.mean((x_hat - x) ** 2, dim=[1, 2, 3]).sum()
                 mse_lss += g_loss.item()
 
                 samples.append(x_hat.detach().clone())
