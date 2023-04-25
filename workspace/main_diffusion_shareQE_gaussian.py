@@ -139,7 +139,7 @@ def main(args):
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-4, lr=args.q_lr, betas=(0.5, 0.999))
-    E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
+    # E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -176,7 +176,6 @@ def main(args):
 
         Q.eval()
         G.eval()
-        E.eval()
         # infer z from given x
         with torch.no_grad():
             z0 = Q_dummy(x)
@@ -185,14 +184,9 @@ def main(args):
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_prior(
+        zk_pos = sample_langevin_post_z_with_gaussian(
             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
-        zk_neg = sample_langevin_prior_z(
-            z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
-            netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
-            e_l_with_noise=args.e_l_with_noise, verbose=False)
-        # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
         
         for __ in range(6):
             # update Q 
@@ -219,31 +213,17 @@ def main(args):
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
 
-        # update E
-        E_optimizer.zero_grad()
-        E.train()
-        e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() # + (e_pos ** 2).mean() + (e_neg ** 2).mean()
-        E_loss.backward()
-        if args.e_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
-        E_optimizer.step()
-
         Q.eval()
         G.eval()
-        E.eval()
         # learning rate schedule
         if (iteration + 1) % 1000 == 0:
             g_lr = max(g_lr * 0.99, 1e-5)
             q_lr = max(q_lr * 0.99, 1e-5)
-            e_lr = max(e_lr * 0.99, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
-            for E_param_group in E_optimizer.param_groups:
-                E_param_group['lr'] = e_lr
-
+            
         if (iteration + 1) % 10 == 0:
             # Update the frozen target models
             for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
@@ -286,34 +266,11 @@ def main(args):
                 'Q_optimizer': Q_optimizer.state_dict(),
                 'Q_dummy_state_dict': Q_dummy.state_dict(),
                 'Q_eval_state_dict': Q_eval.state_dict(),
-                'E_state_dict': E.state_dict(),
-                'E_optimizer': E_optimizer.state_dict(),
                 'iter': iteration
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
         if iteration % args.fid_iter == 0:
-            fid_s_time = time.time()
-            out_fid = calculate_fid_with_diffusion_prior(
-                n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E,
-                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
-            if out_fid < fid_best:
-                fid_best = out_fid
-                print('Saving best checkpoint')
-                save_dict = {
-                    'G_state_dict': G.state_dict(),
-                    'G_optimizer': G_optimizer.state_dict(),
-                    'Q_state_dict': Q.state_dict(),
-                    'Q_optimizer': Q_optimizer.state_dict(),
-                    'Q_dummy_state_dict': Q_dummy.state_dict(),
-                    'Q_eval_state_dict': Q_eval.state_dict(),
-                    'E_state_dict': E.state_dict(),
-                    'E_optimizer': E_optimizer.state_dict(),
-                    'iter': iteration
-                }
-                torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
-            print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
-
             mse_lss = 0.0
             mse_s_time = time.time()
 
@@ -324,7 +281,7 @@ def main(args):
                     z0 = Q(x)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_prior(
+                zk_pos = sample_langevin_post_z_with_gaussian(
                             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
@@ -340,11 +297,30 @@ def main(args):
                 mse_best = mse_lss
             print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
 
+            fid_s_time = time.time()
+            out_fid = calculate_fid_with_diffusion_prior(
+                n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E,
+                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            if out_fid < fid_best:
+                fid_best = out_fid
+                print('Saving best checkpoint')
+                save_dict = {
+                    'G_state_dict': G.state_dict(),
+                    'G_optimizer': G_optimizer.state_dict(),
+                    'Q_state_dict': Q.state_dict(),
+                    'Q_optimizer': Q_optimizer.state_dict(),
+                    'Q_dummy_state_dict': Q_dummy.state_dict(),
+                    'Q_eval_state_dict': Q_eval.state_dict(),
+                    'iter': iteration
+                }
+                torch.save(save_dict, os.path.join(ckpt_dir, 'best_{}_{}.pth.tar'.format(fid_best, mse_best)))
+            print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1, help='random seed')
-    parser.add_argument('--dataset', type=str, default='svhn')
+    parser.add_argument('--dataset', type=str, default='cifar10')
     parser.add_argument('--log_path', type=str, default='../logs/', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')

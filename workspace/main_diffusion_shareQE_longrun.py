@@ -16,7 +16,7 @@ import pytorch_fid_wrapper as pfw
 import shutil
 import datetime as dt
 import re
-from data.dataset import MNIST
+from data.dataset import CIFAR10
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
@@ -58,9 +58,9 @@ def main(args):
     if args.dataset == 'cifar10':
         args.nz = 128
         args.ngf = 128
-        trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-        testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
-        mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+        trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+        testset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+        mset = CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
     elif args.dataset == 'svhn':
         args.nz = 100
         args.ngf = 64
@@ -91,6 +91,8 @@ def main(args):
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
     
+    z_pool = torch.randn(size=(len(trainset), args.nz))
+
     # pre-calculating statistics for fid calculation
     start_time = time.time()
     print("Begin calculating real image statistics")
@@ -177,10 +179,9 @@ def main(args):
         Q.eval()
         G.eval()
         E.eval()
-        # infer z from given x
-        with torch.no_grad():
-            z0 = Q_dummy(x)
-            zp = Q(x=None, b=x.size(0), device=x.device)
+        
+        # pull long-run chain samples
+        z0 = z_pool[idx].cuda()
         zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
@@ -192,15 +193,12 @@ def main(args):
             z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
             netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
-        # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
+        z_pool[idx] = zk_pos.detach().clone().cpu()
         
         for __ in range(6):
             # update Q 
             Q_optimizer.zero_grad()
             Q.train()
-            # Q_loss_p = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            # Q_loss_n = Q.calculate_loss(x=x, z=zk_neg, mask=1 - z_mask).mean()
-            # Q_loss = Q_loss_p + Q_loss_n
 
             Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
             Q_loss.backward()
@@ -293,6 +291,31 @@ def main(args):
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
         if iteration % args.fid_iter == 0:
+            mse_lss = 0.0
+            mse_s_time = time.time()
+
+            i = 0
+            for x, _ in mloader:
+                x = x.cuda()
+                z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
+                zk_pos = z0.detach().clone()
+                zk_pos.requires_grad = True
+                zk_pos = sample_langevin_post_z_with_prior(
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=40, # if out_fid > fid_best else 40, 
+                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            g_l_step_size=args.g_l_step_size, verbose=False
+                        )
+
+                with torch.no_grad():
+                    x_hat = G(zk_pos)
+                    g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
+                mse_lss += g_loss.item()
+
+            mse_lss /= len(mset)
+            if mse_lss < mse_best:
+                mse_best = mse_lss
+            print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
+
             fid_s_time = time.time()
             out_fid = calculate_fid_with_diffusion_prior(
                 n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E,
@@ -311,35 +334,8 @@ def main(args):
                     'E_optimizer': E_optimizer.state_dict(),
                     'iter': iteration
                 }
-                torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
+                torch.save(save_dict, os.path.join(ckpt_dir, 'best_{}_{}.pth.tar'.format(fid_best, mse_best)))
             print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
-
-            mse_lss = 0.0
-            mse_s_time = time.time()
-
-            i = 0
-            for x, _ in mloader:
-                x = x.cuda()
-                with torch.no_grad():
-                    z0 = Q(x)
-                zk_pos = z0.detach().clone()
-                zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
-                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
-                            g_l_step_size=args.g_l_step_size, verbose=False
-                        )
-
-                with torch.no_grad():
-                    x_hat = G(zk_pos)
-                    g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
-                mse_lss += g_loss.item()
-
-            mse_lss /= len(mset)
-            if mse_lss < mse_best:
-                mse_best = mse_lss
-            print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
