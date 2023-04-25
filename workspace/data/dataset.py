@@ -249,8 +249,6 @@ class CIFAR10(VisionDataset):
 
     def _load_meta(self) -> None:
         path = os.path.join(self.root, self.base_folder, self.meta["filename"])
-        if not check_integrity(path, self.meta["md5"]):
-            raise RuntimeError("Dataset metadata file not found or corrupted. You can use download=True to download it")
         with open(path, "rb") as infile:
             data = pickle.load(infile, encoding="latin1")
             self.classes = data[self.meta["key"]]
