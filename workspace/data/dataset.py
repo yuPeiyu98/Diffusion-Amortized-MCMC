@@ -220,9 +220,7 @@ class CIFAR10(VisionDataset):
         target_transform: Optional[Callable] = None,
         download: bool = False,
     ):
-        super().__init__(
-            root, train, transform, target_transform, download
-        )
+        super().__init__()
 
         self.train = train  # training set or test set
 
