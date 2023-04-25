@@ -16,7 +16,7 @@ import pytorch_fid_wrapper as pfw
 import shutil
 import datetime as dt
 import re
-from data.dataset import MNIST
+from data.dataset import CIFAR10
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
@@ -58,9 +58,9 @@ def main(args):
     if args.dataset == 'cifar10':
         args.nz = 128
         args.ngf = 128
-        trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-        testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
-        mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+        trainset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
+        testset = CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
+        mset = CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
     elif args.dataset == 'svhn':
         args.nz = 100
         args.ngf = 64
