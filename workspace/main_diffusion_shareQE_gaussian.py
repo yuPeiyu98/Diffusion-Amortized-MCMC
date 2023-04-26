@@ -138,7 +138,7 @@ def main(args):
     Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-4, lr=args.q_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-2, lr=args.q_lr, betas=(0.5, 0.999))
     # E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0

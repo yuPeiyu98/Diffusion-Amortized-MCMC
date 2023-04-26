@@ -140,11 +140,12 @@ def main(args):
     Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-4, lr=args.q_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-2, lr=args.q_lr, betas=(0.5, 0.999))
     E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
+    fid_best_ = 10000
     mse_best = 10000
     if args.resume_path is not None:
         print('load from ', args.resume_path)
@@ -190,12 +191,13 @@ def main(args):
             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
-            z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
+            # z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
+            z=zk_neg,
             netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
         z_pool[idx] = zk_pos.detach().clone().cpu()
         
-        for __ in range(6):
+        for __ in range(1):
             # update Q 
             Q_optimizer.zero_grad()
             Q.train()
@@ -322,6 +324,14 @@ def main(args):
             out_fid = calculate_fid_with_diffusion_prior(
                 n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+            out_fid_ = calculate_fid(
+                n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
+                e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
+                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
+
+            if out_fid_ < fid_best:
+                fid_best_ = out_fid_
+
             if out_fid < fid_best:
                 fid_best = out_fid
                 print('Saving best checkpoint')
@@ -337,6 +347,7 @@ def main(args):
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best_{}_{}.pth.tar'.format(fid_best, mse_best)))
+            print("Finish calculating fid time (EBM) {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid_, fid_best_))
             print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
 if __name__ == "__main__":
