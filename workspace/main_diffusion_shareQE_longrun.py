@@ -297,11 +297,13 @@ def main(args):
             i = 0
             for x, _ in mloader:
                 x = x.cuda()
-                z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
+                # z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
+                with torch.no_grad():
+                    z0 = Q(x)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=40, # if out_fid > fid_best else 40, 
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
