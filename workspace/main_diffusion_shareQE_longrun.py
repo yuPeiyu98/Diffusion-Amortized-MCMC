@@ -21,7 +21,6 @@ from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netE, 
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid
 
-
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 #################### training #####################################
@@ -294,6 +293,7 @@ def main(args):
         
         if iteration % args.fid_iter == 0:
             mse_lss = 0.0
+            mse_g_lss = 0.0
             mse_s_time = time.time()
 
             i = 0
@@ -315,10 +315,28 @@ def main(args):
                     g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
                 mse_lss += g_loss.item()
 
+                #########
+
+                z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
+                zk_pos = z0.detach().clone()
+                zk_pos.requires_grad = True
+                zk_pos = sample_langevin_post_z_with_prior(
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=40, # if out_fid > fid_best else 40, 
+                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
+                            g_l_step_size=args.g_l_step_size, verbose=False
+                        )
+
+                with torch.no_grad():
+                    x_hat = G(zk_pos)
+                    g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
+                mse_g_lss += g_loss.item()
+
             mse_lss /= len(mset)
+            mse_g_lss /= len(mset)
             if mse_lss < mse_best:
                 mse_best = mse_lss
-            print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
+            print("Finish calculating mse time {:.3f} mse {:.3f} {:.3f} / {:.3f}".format(
+                time.time() - mse_s_time, mse_lss, mse_g_lss, mse_best))
 
             fid_s_time = time.time()
             out_fid = calculate_fid_with_diffusion_prior(
