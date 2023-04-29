@@ -158,7 +158,8 @@ def main(args):
             z=zk_pos, x=x, netG=G, netF=F, netE=E,
             g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
-            z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
+            z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
+            netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
         
         # Q grad. cumul.
