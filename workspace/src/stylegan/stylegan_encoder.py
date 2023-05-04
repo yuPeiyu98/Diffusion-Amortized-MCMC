@@ -16,7 +16,7 @@ __all__ = ['StyleGANEncoder']
 class StyleGANEncoder(nn.Module):
   """Defines the encoder class of StyleGAN inversion."""
 
-  def __init__(self, weight_path, resolution=256):
+  def __init__(self, weight_path, load=True, resolution=256):
     super().__init__()
     self.resolution = resolution
 
@@ -38,11 +38,12 @@ class StyleGANEncoder(nn.Module):
     self.encode_dim = [self.num_layers, self.w_space_dim]
 
     self.weight_path = weight_path
-    if not os.path.isfile(self.weight_path):
-      raise IOError('No pre-trained weights found for Encoder model!')
-    state_dict = torch.load(self.weight_path)
-    self.net.load_state_dict(state_dict)
-    self.net.eval()
+    if load:
+        if not os.path.isfile(self.weight_path):
+          raise IOError('No pre-trained weights found for Encoder model!')
+        state_dict = torch.load(self.weight_path)
+        self.net.load_state_dict(state_dict)
+        self.net.eval()
 
   def forward(self, x):
     codes = self.net(x)
