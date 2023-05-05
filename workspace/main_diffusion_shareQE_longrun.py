@@ -182,7 +182,8 @@ def main(args):
         
         # pull long-run chain samples
         z0 = z_pool[idx].cuda()
-        zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
+        z0_ = torch.randn_like(z0)
+        zk_pos, zk_neg = z0.detach().clone(), z0_.detach().clone()
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
 
@@ -196,37 +197,41 @@ def main(args):
             e_l_with_noise=args.e_l_with_noise, verbose=False)
         z_pool[idx] = zk_pos.detach().clone().cpu()
         
-        for __ in range(1):
-            # update Q 
-            Q_optimizer.zero_grad()
-            Q.train()
+        Q_loss, g_loss, E_loss = 0, 0, 0
+        e_pos, e_neg = 0, 0
+        if iteration > 25000:
+            for __ in range(1):
+                # update Q 
+                Q_optimizer.zero_grad()
+                Q.train()
 
-            Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            Q_loss.backward()
-            if args.q_is_grad_clamp:
-                torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
-            Q_optimizer.step()
+                Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
+                Q_loss.backward()
+                if args.q_is_grad_clamp:
+                    torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
+                Q_optimizer.step()
         
-        # update G
-        G_optimizer.zero_grad()
-        G.train()
+        else:
+            # update G
+            G_optimizer.zero_grad()
+            G.train()
 
-        x_hat = G(zk_pos)
-        g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        g_loss.backward()
-        if args.g_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
-        G_optimizer.step()
+            x_hat = G(zk_pos)
+            g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
+            g_loss.backward()
+            if args.g_is_grad_clamp:
+                torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
+            G_optimizer.step()
 
-        # update E
-        E_optimizer.zero_grad()
-        E.train()
-        e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() # + (e_pos ** 2).mean() + (e_neg ** 2).mean()
-        E_loss.backward()
-        if args.e_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
-        E_optimizer.step()
+            # update E
+            E_optimizer.zero_grad()
+            E.train()
+            e_pos, e_neg = E(zk_pos), E(zk_neg)
+            E_loss = e_pos.mean() - e_neg.mean() # + (e_pos ** 2).mean() + (e_neg ** 2).mean()
+            E_loss.backward()
+            if args.e_is_grad_clamp:
+                torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
+            E_optimizer.step()
 
         Q.eval()
         G.eval()
@@ -347,7 +352,7 @@ def main(args):
                 e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
 
-            if out_fid_ < fid_best:
+            if out_fid_ < fid_best_:
                 fid_best_ = out_fid_
 
             if out_fid < fid_best:
