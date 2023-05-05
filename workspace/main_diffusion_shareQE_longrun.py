@@ -197,8 +197,8 @@ def main(args):
             e_l_with_noise=args.e_l_with_noise, verbose=False)
         z_pool[idx] = zk_pos.detach().clone().cpu()
         
-        Q_loss, g_loss, E_loss = 0, 0, 0
-        e_pos, e_neg = 0, 0
+        Q_loss, g_loss = torch.tensor(0), torch.tensor(0)
+        # e_pos, e_neg = 0, 0
         if iteration > 25000:
             for __ in range(1):
                 # update Q 
@@ -238,9 +238,11 @@ def main(args):
         E.eval()
         # learning rate schedule
         if (iteration + 1) % 1000 == 0:
-            g_lr = max(g_lr * 0.99, 1e-5)
-            q_lr = max(q_lr * 0.99, 1e-5)
-            e_lr = max(e_lr * 0.99, 1e-5)
+            if iteration > 25000:
+                q_lr = max(q_lr * 0.99, 1e-5)
+            else:
+                g_lr = max(g_lr * 0.99, 1e-5)
+                e_lr = max(e_lr * 0.99, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
