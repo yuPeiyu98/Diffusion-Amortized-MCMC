@@ -484,8 +484,7 @@ def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
         x = netG(zk_prior)
     return x
 
-def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise, real_m, real_s, save_name):
-    bs = 500
+def calculate_fid(n_samples, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise, real_m, real_s, save_name, bs=500):
     fid_samples = []
         
     for i in range(n_samples // bs):
@@ -567,8 +566,7 @@ def gen_samples_with_diffusion_prior_E(b, device, netQ, netG, netE):
         x = netG(zk_prior)
     return x, zk_prior
 
-def calculate_fid_with_diffusion_prior(n_samples, device, netQ, netG, netE, real_m, real_s, save_name):
-    bs = 500
+def calculate_fid_with_diffusion_prior(n_samples, device, netQ, netG, netE, real_m, real_s, save_name, bs=500):
     fid_samples = []
         
     for i in range(n_samples // bs):

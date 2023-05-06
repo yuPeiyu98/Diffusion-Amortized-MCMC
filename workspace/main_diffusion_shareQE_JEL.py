@@ -165,6 +165,7 @@ def main(args):
 
     start_iter = 0
     fid_best = 10000
+    fid_best_ = 10000
     mse_best = 10000
     if args.resume_path is not None:
         print('load from ', args.resume_path)
@@ -318,7 +319,13 @@ def main(args):
             fid_s_time = time.time()
             out_fid = calculate_fid_with_diffusion_prior(
                 n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E,
-                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration), bs=args.batch_size)
+            out_fid_ = calculate_fid(
+                n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
+                e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
+                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"), bs=args.batch_size)
+            if out_fid_ < fid_best_:
+                fid_best_ = out_fid_
             if out_fid < fid_best:
                 fid_best = out_fid
                 print('Saving best checkpoint')
@@ -334,7 +341,8 @@ def main(args):
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
-            print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
+            print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f} | ebm {:.3f} / {:.3f}".format(
+            	time.time() - fid_s_time, out_fid, fid_best, out_fid_, fid_best_))
 
             mse_lss = 0.0
             mse_s_time = time.time()
@@ -372,7 +380,7 @@ if __name__ == "__main__":
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     
     # data related parameters
-    parser.add_argument('--batch_size', type=int, default=48, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
     parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
