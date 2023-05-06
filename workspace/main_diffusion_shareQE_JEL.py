@@ -372,7 +372,7 @@ if __name__ == "__main__":
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
     
     # data related parameters
-    parser.add_argument('--batch_size', type=int, default=64, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=48, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
     parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     

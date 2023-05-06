@@ -25,6 +25,8 @@ def set_requires_grad(nets, requires_grad=False):
 
 def sample_langevin_prior_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, verbose=False):
     mystr = "Step/en/z_norm: "
+
+    set_requires_grad(netE, requires_grad=False)
     for i in range(e_l_steps):
         en = netE(z).sum()
         z_norm = 1.0 / 2.0 * torch.sum(z**2)
@@ -40,6 +42,7 @@ def sample_langevin_prior_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, v
         print("Log prior sampling.")
         print(mystr)
     # z.requires_grad = False
+    set_requires_grad(netE, requires_grad=True)
     return z.detach()
 
 def sample_langevin_prior_nce_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, verbose=False):
@@ -103,6 +106,9 @@ def sample_langevin_post_z_with_diffusion(z, x, netG, netE, g_l_steps, g_llhd_si
 def sample_langevin_post_z_with_prior(z, x, netG, netE, g_l_steps, g_llhd_sigma, g_l_with_noise, g_l_step_size, verbose = False):
     mystr = "Step/cross_entropy/recons_loss: "
 
+    set_requires_grad(netG, requires_grad=False)
+    set_requires_grad(netE, requires_grad=False)
+
     for i in range(g_l_steps):
         x_hat = netG(z)
         g_log_lkhd = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat - x) ** 2)
@@ -120,6 +126,9 @@ def sample_langevin_post_z_with_prior(z, x, netG, netE, g_l_steps, g_llhd_sigma,
     if verbose:
         print("Log posterior sampling.")
         print(mystr)
+
+    set_requires_grad(netG, requires_grad=True)
+    set_requires_grad(netE, requires_grad=True)
     return z.detach()
 
 def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = False):
