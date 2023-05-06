@@ -103,7 +103,7 @@ def main(args):
         ])
 
         trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_train)
-        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_test) 
+        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'val'), transform=transform_test) 
         mset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'test'), transform=transform_test)
 
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
