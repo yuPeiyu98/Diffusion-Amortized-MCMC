@@ -19,7 +19,7 @@ import re
 from data.dataset import MNIST
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
-from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
+from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -382,7 +382,7 @@ if __name__ == "__main__":
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
-    parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
+    parser.add_argument('--n_fid_samples', type=int, default=500, help='number of samples for calculating fid during training')
     
     # network structure related parameters
     parser.add_argument('--nz', type=int, default=128, help='z vector length')
