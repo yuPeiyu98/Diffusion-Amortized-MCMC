@@ -119,6 +119,54 @@ class _netG_celeba64(nn.Module):
         _z = z.reshape((len(z), self.nz, 1, 1))
         return self.gen(_z)
 
+class _netG_celebaHQ(nn.Module):
+    def __init__(self, nz=128, ngf=128, nc=3, use_spc_norm=False):
+        super().__init__()
+        self.nz = nz
+        f = nn.LeakyReLU(0.2)
+
+        self.gen = nn.Sequential(
+            spectral_norm(
+                nn.ConvTranspose2d(nz, ngf*16, 4, 1, 0, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*16, ngf*8, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*8, ngf*4, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*4, ngf*4, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*4, ngf*2, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf*2, ngf, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            f,
+            spectral_norm(
+                nn.ConvTranspose2d(ngf, nc, 4, 2, 1, bias = True),
+                use_spc_norm
+            ),
+            nn.Tanh()
+        )    
+    
+    def forward(self, z):
+        _z = z.reshape((len(z), self.nz, 1, 1))
+        return self.gen(_z)
+
 class _netG_mnist(nn.Module):
     def __init__(self, nz=100, ngf=128, nc=1, use_spc_norm=False):
         super().__init__()
@@ -241,6 +289,66 @@ class Encoder_celeba64(nn.Module):
             nn.LeakyReLU(0.2, inplace=True),
             spectral_norm(
                 nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
+                use_spc_norm
+            ),
+            self.norm(nif * 8, affine=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(
+                nn.Conv2d(nif * 8, nif * 8, 4, 2, 1, bias=True),
+                use_spc_norm
+            ),
+            self.norm(nif * 8, affine=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(
+                nn.Conv2d(nif * 8, nemb, 4, 1, 0),
+                use_spc_norm
+            )
+        )
+        self.net = nn.Sequential(*modules)
+
+    def forward(self, x):
+        return self.net(x).reshape((len(x), self.nemb))
+
+class Encoder_celebaHQ(nn.Module):
+    def __init__(self, nc=3, nemb=128, nif=64, use_norm=True, use_spc_norm=False):
+        super().__init__()
+        self.norm = nn.InstanceNorm2d if use_norm else nn.Identity
+        # self.norm = nn.GroupNorm if use_norm else nn.Identity
+
+        self.nemb = nemb
+        modules = nn.Sequential(
+            spectral_norm(
+                nn.Conv2d(nc, nif, 3, 1, 1, bias=True),
+                use_spc_norm
+            ),
+            self.norm(nif, affine=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(
+                nn.Conv2d(nif, nif * 2, 4, 2, 1, bias=True),
+                use_spc_norm,
+            ),
+            self.norm(nif * 2, affine=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(
+                nn.Conv2d(nif * 2, nif * 4, 4, 2, 1, bias=True),
+                use_spc_norm
+            ),
+            self.norm(nif * 4, affine=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(
+                nn.Conv2d(nif * 4, nif * 4, 4, 2, 1, bias=True),
+                use_spc_norm
+            ),
+            self.norm(nif * 4, affine=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(
+                nn.Conv2d(nif * 4, nif * 8, 4, 2, 1, bias=True),
+                use_spc_norm
+            ),
+            self.norm(nif * 8, affine=True),
+            nn.LeakyReLU(0.2, inplace=True),
+            spectral_norm(
+                nn.Conv2d(nif * 8, nif * 8, 4, 2, 1, bias=True),
                 use_spc_norm
             ),
             self.norm(nif * 8, affine=True),
@@ -842,8 +950,10 @@ class _netQ_U(nn.Module):
             self.encoder = Encoder_cifar10(nc=nc, nemb=nxemb, nif=nif)
         elif dataset == 'mnist':
             self.encoder = Encoder_mnist(nc=1, nemb=nxemb, nif=nif)
-        else:
+        elif dataset == 'celeba64':
             self.encoder = Encoder_celeba64(nc=nc, nemb=nxemb, nif=nif)
+        else:
+            self.encoder = Encoder_celebaHQ(nc=nc, nemb=nxemb, nif=nif)
 
         if net_arch == 'vanilla':
             self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
