@@ -103,7 +103,7 @@ def main(args):
         ])
 
         trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_train)
-        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'val'), transform=transform_test) 
+        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_test) 
         mset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'test'), transform=transform_test)
 
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
@@ -160,7 +160,6 @@ def main(args):
     Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=1e-4, lr=args.q_lr, betas=(0.5, 0.999))
     E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
@@ -200,10 +199,8 @@ def main(args):
         Q.eval()
         G.eval()
         E.eval()
-        # infer z from given x
-        with torch.no_grad():
-            z0 = Q_dummy(x)
-            zp = Q(x=None, b=x.size(0), device=x.device)
+        
+        z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
         zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
@@ -212,24 +209,9 @@ def main(args):
             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
-            z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
-            netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
+            z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
             e_l_with_noise=args.e_l_with_noise, verbose=False)
         # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
-        
-        for __ in range(6):
-            # update Q 
-            Q_optimizer.zero_grad()
-            Q.train()
-            # Q_loss_p = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            # Q_loss_n = Q.calculate_loss(x=x, z=zk_neg, mask=1 - z_mask).mean()
-            # Q_loss = Q_loss_p + Q_loss_n
-
-            Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
-            Q_loss.backward()
-            if args.q_is_grad_clamp:
-                torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
-            Q_optimizer.step()
         
         # update G
         G_optimizer.zero_grad()
@@ -246,7 +228,7 @@ def main(args):
         E_optimizer.zero_grad()
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() # + (e_pos ** 2).mean() + (e_neg ** 2).mean()
+        E_loss = e_pos.mean() - e_neg.mean() + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-3
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
@@ -262,28 +244,14 @@ def main(args):
             e_lr = max(e_lr * 0.99, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
-            for Q_param_group in Q_optimizer.param_groups:
-                Q_param_group['lr'] = q_lr
             for E_param_group in E_optimizer.param_groups:
                 E_param_group['lr'] = e_lr
-
-        if (iteration + 1) % 10 == 0:
-            # Update the frozen target models
-            for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-
-        # for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
-        #     target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
-        # if (iteration + 1) % 1000 == 0:
-        #     # Update the frozen target models
-        #     for param, target_param in zip(Q_eval.parameters(), Q_dummy.parameters()):
-        #         target_param.data.copy_(param.data)
 
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
             #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
-                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
+                iteration, time.time() - start_time, g_loss.item(), 0, g_lr, q_lr))
             print(zk_pos.max(), zk_pos.min())
         if iteration % args.plot_iter == 0:
             # reconstruction
@@ -296,7 +264,9 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            samples, _ = gen_samples_with_diffusion_prior(b=64, device=z0.device, netQ=Q, netG=G) 
+            samples, _ = gen_samples(
+                bs=64, nz=args.nz, netE=E, netG=G, 
+                e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -317,17 +287,12 @@ def main(args):
         
         if iteration % args.fid_iter == 0:
             fid_s_time = time.time()
-            out_fid = calculate_fid_with_diffusion_prior(
-                n_samples=args.n_fid_samples, device=z0.device, netQ=Q, netG=G, netE=E,
-                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration), bs=args.batch_size)
             out_fid_ = calculate_fid(
                 n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
                 e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"), bs=args.batch_size)
             if out_fid_ < fid_best_:
                 fid_best_ = out_fid_
-            if out_fid < fid_best:
-                fid_best = out_fid
                 print('Saving best checkpoint')
                 save_dict = {
                     'G_state_dict': G.state_dict(),
@@ -341,8 +306,8 @@ def main(args):
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
-            print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f} | ebm {:.3f} / {:.3f}".format(
-            	time.time() - fid_s_time, out_fid, fid_best, out_fid_, fid_best_))
+            print("Finish calculating fid time {:.3f} ebm {:.3f} / {:.3f}".format(
+            	time.time() - fid_s_time, out_fid_, fid_best_))
 
             mse_lss = 0.0
             mse_s_time = time.time()
@@ -350,12 +315,11 @@ def main(args):
             i = 0
             for x, _ in mloader:
                 x = x.cuda()
-                with torch.no_grad():
-                    z0 = Q(x)
+                z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=100, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
@@ -382,7 +346,7 @@ if __name__ == "__main__":
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
-    parser.add_argument('--n_fid_samples', type=int, default=500, help='number of samples for calculating fid during training')
+    parser.add_argument('--n_fid_samples', type=int, default=5000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
     parser.add_argument('--nz', type=int, default=128, help='z vector length')
