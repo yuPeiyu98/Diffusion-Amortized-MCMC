@@ -19,7 +19,7 @@ import re
 from data.dataset import MNIST
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
-from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid
+from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, gen_samples, calculate_fid
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -289,7 +289,7 @@ def main(args):
             fid_s_time = time.time()
             out_fid_ = calculate_fid(
                 n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
-                e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
+                e_l_steps=100, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"), bs=args.batch_size)
             if out_fid_ < fid_best_:
                 fid_best_ = out_fid_
