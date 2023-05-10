@@ -203,7 +203,7 @@ def main(args):
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_prior(
+        zk_pos = sample_langevin_post_z_with_gaussian(
             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
@@ -295,7 +295,7 @@ def main(args):
                 z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_prior(
+                zk_pos = sample_langevin_post_z_with_gaussian(
                             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=100, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
@@ -347,7 +347,7 @@ if __name__ == "__main__":
     parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
-    parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
+    parser.add_argument('--g_llhd_sigma', type=float, default=1, help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')

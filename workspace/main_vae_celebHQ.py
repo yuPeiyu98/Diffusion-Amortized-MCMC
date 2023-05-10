@@ -17,7 +17,7 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import MNIST
-from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ, _netQ_uncond, _netQ_U
+from src.vae_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, gen_samples, calculate_fid
 
@@ -134,15 +134,15 @@ def main(args):
         G = _netG_celeba64(nz=args.nz, ngf=args.ngf, nc=args.nc)
     elif args.dataset == 'celebaHQ':
         G = _netG_celebaHQ(nz=args.nz, ngf=args.ngf, nc=args.nc)
-    Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
+    Q = _netQ(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset)
-    Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
+    Q_dummy = _netQ(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset)
-    Q_eval = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
+    Q_eval = _netQ(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset)
@@ -160,7 +160,7 @@ def main(args):
     Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
+    Q_optimizer = optim.Adam(Q.parameters(), lr=args.q_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -190,27 +190,11 @@ def main(args):
         x = x.cuda()
         # print(idx)
 
-        z_mask_prob = torch.rand((len(x),), device=x.device)
-        z_mask = torch.ones(len(x), device=x.device)
-        z_mask[z_mask_prob < p_mask] = 0.0
-        z_mask = z_mask.unsqueeze(-1)
-
         Q.eval()
         G.eval()
         E.eval()
-        
-        z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
-        zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
-        zk_pos.requires_grad = True
-        zk_neg.requires_grad = True
 
-        zk_pos = sample_langevin_post_z_with_prior(
-            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
-            g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
-        zk_neg = sample_langevin_prior_z(
-            z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
-            e_l_with_noise=args.e_l_with_noise, verbose=False)
-        # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
+        zk_pos, mu, lvar = Q(x)
         
         # update G
         G_optimizer.zero_grad()
@@ -223,19 +207,17 @@ def main(args):
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
 
-        # update E
-        E_optimizer.zero_grad()
-        E.train()
-        e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-3
-        E_loss.backward()
-        if args.e_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
-        E_optimizer.step()
+        Q_optimizer.zero_grad()
+        Q.train()
 
-        Q.eval()
+        Q_loss = Q.calculate_loss(z=zk_pos, mu=mu, logvar=lvar)
+        Q_loss.backward()
+        if args.q_is_grad_clamp:
+            torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
+        Q_optimizer.step()
+
         G.eval()
-        E.eval()
+        Q.eval()
         # learning rate schedule
         if (iteration + 1) % 1000 == 0:
             g_lr = max(g_lr * 0.99, 1e-5)
@@ -243,14 +225,14 @@ def main(args):
             e_lr = max(e_lr * 0.99, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
-            for E_param_group in E_optimizer.param_groups:
-                E_param_group['lr'] = e_lr
+            for Q_param_group in Q_optimizer.param_groups:
+                Q_param_group['lr'] = q_lr
 
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
             #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
-                iteration, time.time() - start_time, g_loss.item(), 0, g_lr, q_lr))
+                iteration, time.time() - start_time, g_loss.item(), g_loss.item(), g_lr, q_lr))
             print(zk_pos.max(), zk_pos.min())
         if iteration % args.plot_iter == 0:
             # reconstruction
@@ -265,7 +247,7 @@ def main(args):
             # samples
             samples = gen_samples(
                 bs=64, nz=args.nz, netE=E, netG=G, 
-                e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise) 
+                e_l_steps=0, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -275,10 +257,10 @@ def main(args):
                 'G_state_dict': G.state_dict(),
                 'G_optimizer': G_optimizer.state_dict(),
                 'Q_state_dict': Q.state_dict(),
+                'Q_optimizer': Q_optimizer.state_dict(),
                 'Q_dummy_state_dict': Q_dummy.state_dict(),
                 'Q_eval_state_dict': Q_eval.state_dict(),
                 'E_state_dict': E.state_dict(),
-                'E_optimizer': E_optimizer.state_dict(),
                 'iter': iteration
             }
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
@@ -287,7 +269,7 @@ def main(args):
             fid_s_time = time.time()
             out_fid_ = calculate_fid(
                 n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
-                e_l_steps=100, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
+                e_l_steps=0, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"), bs=args.batch_size)
             if out_fid_ < fid_best_:
                 fid_best_ = out_fid_
@@ -296,10 +278,10 @@ def main(args):
                     'G_state_dict': G.state_dict(),
                     'G_optimizer': G_optimizer.state_dict(),
                     'Q_state_dict': Q.state_dict(),
+                    'Q_optimizer': Q_optimizer.state_dict(),
                     'Q_dummy_state_dict': Q_dummy.state_dict(),
                     'Q_eval_state_dict': Q_eval.state_dict(),
                     'E_state_dict': E.state_dict(),
-                    'E_optimizer': E_optimizer.state_dict(),
                     'iter': iteration
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
@@ -315,7 +297,7 @@ def main(args):
                 z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_prior(
+                zk_pos = sample_langevin_post_z_with_gaussian(
                             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=100, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
