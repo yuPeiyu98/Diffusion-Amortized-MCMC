@@ -172,7 +172,6 @@ def main(args):
         G.load_state_dict(state_dict['G_state_dict'])
         Q.load_state_dict(state_dict['Q_state_dict'])
         G_optimizer.load_state_dict(state_dict['G_optimizer'])
-        Q_optimizer.load_state_dict(state_dict['Q_optimizer'])
         start_iter = state_dict['iter'] + 1
     
     g_lr = args.g_lr
@@ -276,7 +275,6 @@ def main(args):
                 'G_state_dict': G.state_dict(),
                 'G_optimizer': G_optimizer.state_dict(),
                 'Q_state_dict': Q.state_dict(),
-                'Q_optimizer': Q_optimizer.state_dict(),
                 'Q_dummy_state_dict': Q_dummy.state_dict(),
                 'Q_eval_state_dict': Q_eval.state_dict(),
                 'E_state_dict': E.state_dict(),
@@ -298,7 +296,6 @@ def main(args):
                     'G_state_dict': G.state_dict(),
                     'G_optimizer': G_optimizer.state_dict(),
                     'Q_state_dict': Q.state_dict(),
-                    'Q_optimizer': Q_optimizer.state_dict(),
                     'Q_dummy_state_dict': Q_dummy.state_dict(),
                     'Q_eval_state_dict': Q_eval.state_dict(),
                     'E_state_dict': E.state_dict(),
