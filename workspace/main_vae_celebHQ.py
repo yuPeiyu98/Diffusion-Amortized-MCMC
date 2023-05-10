@@ -291,16 +291,8 @@ def main(args):
             i = 0
             for x, _ in mloader:
                 x = x.cuda()
-                z0 = torch.randn(size=(x.size(0), args.nz), device=x.device)
-                zk_pos = z0.detach().clone()
-                zk_pos.requires_grad = True
-                zk_pos = sample_langevin_post_z_with_gaussian(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=100, # if out_fid > fid_best else 40, 
-                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
-                            g_l_step_size=args.g_l_step_size, verbose=False
-                        )
-
                 with torch.no_grad():
+                    zk_pos, __, __ = Q(x)
                     x_hat = G(zk_pos)
                     g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
                 mse_lss += g_loss.item()
