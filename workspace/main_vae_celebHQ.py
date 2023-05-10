@@ -188,30 +188,27 @@ def main(args):
             train_iter = iter(trainloader)
             x, idx = next(train_iter)
         x = x.cuda()
-        # print(idx)
 
-        Q.eval()
-        G.eval()
-        E.eval()
+        G.train()
+        Q.train()
 
         zk_pos, mu, lvar = Q(x)
         
-        # update G
-        G_optimizer.zero_grad()
-        G.train()
-
+        # G
         x_hat = G(zk_pos)
         g_loss = torch.sum((x_hat - x) ** 2, dim=[1,2,3]).mean()
-        g_loss.backward()
+        Q_loss = Q.calculate_loss(z=zk_pos, mu=mu, logvar=lvar)
+
+        G_optimizer.zero_grad()
+        Q_optimizer.zero_grad()
+
+        (g_loss + Q_loss).backward()
+        # Q_loss.backward()
+
         if args.g_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
 
-        Q_optimizer.zero_grad()
-        Q.train()
-
-        Q_loss = Q.calculate_loss(z=zk_pos, mu=mu, logvar=lvar)
-        Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
         Q_optimizer.step()
