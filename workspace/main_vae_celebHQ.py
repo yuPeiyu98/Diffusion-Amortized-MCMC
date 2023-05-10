@@ -234,7 +234,7 @@ def main(args):
         if iteration % args.plot_iter == 0:
             # reconstruction
             with torch.no_grad():
-                x_hat_q = G(z0)
+                x_hat_q = G(zk_pos)
                 save_images = x[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_obs.png'.format(img_dir, iteration), normalize=True, nrow=8)
                 save_images = x_hat[:64].detach().cpu()
