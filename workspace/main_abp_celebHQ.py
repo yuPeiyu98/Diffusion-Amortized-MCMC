@@ -160,7 +160,6 @@ def main(args):
     Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
-    E_optimizer = optim.Adam(E.parameters(), lr=args.e_lr, betas=(0.5, 0.999))
 
     start_iter = 0
     fid_best = 10000
@@ -208,10 +207,6 @@ def main(args):
         zk_pos = sample_langevin_post_z_with_prior(
             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
-        zk_neg = sample_langevin_prior_z(
-            z=zk_neg, netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
-            e_l_with_noise=args.e_l_with_noise, verbose=False)
-        # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
         
         # update G
         G_optimizer.zero_grad()
@@ -224,17 +219,6 @@ def main(args):
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
 
-        # update E
-        E_optimizer.zero_grad()
-        E.train()
-        e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-3
-        E_loss.backward()
-        if args.e_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
-        E_optimizer.step()
-
-        Q.eval()
         G.eval()
         E.eval()
         # learning rate schedule
@@ -244,8 +228,6 @@ def main(args):
             e_lr = max(e_lr * 0.99, 1e-5)
             for G_param_group in G_optimizer.param_groups:
                 G_param_group['lr'] = g_lr
-            for E_param_group in E_optimizer.param_groups:
-                E_param_group['lr'] = e_lr
 
         if iteration % args.print_iter == 0:
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
@@ -266,7 +248,7 @@ def main(args):
             # samples
             samples = gen_samples(
                 bs=64, nz=args.nz, netE=E, netG=G, 
-                e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise) 
+                e_l_steps=0, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -289,7 +271,7 @@ def main(args):
             fid_s_time = time.time()
             out_fid_ = calculate_fid(
                 n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
-                e_l_steps=100, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
+                e_l_steps=0, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"), bs=args.batch_size)
             if out_fid_ < fid_best_:
                 fid_best_ = out_fid_
