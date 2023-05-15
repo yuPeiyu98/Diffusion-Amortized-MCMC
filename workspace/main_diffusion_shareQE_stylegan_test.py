@@ -128,9 +128,13 @@ def main(args):
 
         cur_samples = x_hat.detach()
         fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
+        obs_samples = (1.0 + torch.clamp(x, min=-1.0, max=1.0)) / 2.0
         for j, sample in enumerate(fid_samples):
             torchvision.utils.save_image(
-                sample, '{}/fid_{:05d}.png'.format(img_dir, i * bs + j), 
+                sample, '{}/recon_{:05d}.png'.format(img_dir, i * bs + j), 
+                normalize=True)
+            torchvision.utils.save_image(
+                obs_samples[j], '{}/obs_{:05d}.png'.format(img_dir, i * bs + j), 
                 normalize=True)
         i += 1
 
@@ -152,7 +156,7 @@ if __name__ == "__main__":
                                                          help='pretrained ckpt path for perceptual model')
     
     # data related parameters
-    parser.add_argument('--batch_size', type=int, default=128, help='batch size')
+    parser.add_argument('--batch_size', type=int, default=64, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
     parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
