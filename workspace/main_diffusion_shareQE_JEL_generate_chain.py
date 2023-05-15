@@ -177,7 +177,7 @@ def main(args):
             for t, zk_prior in enumerate(z_l):
                 zk_prior = zk_prior.clone().detach()
                 with torch.no_grad():
-                    x = netG(zk_prior)
+                    x = G(zk_prior)
                 cur_samples = x
                 fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
                 for j, sample in enumerate(fid_samples):
