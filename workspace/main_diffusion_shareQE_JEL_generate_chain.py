@@ -174,15 +174,16 @@ def main(args):
                     en_l.append(en_b)
                     z_l.append(z)
 
-            zk_prior = z.clone().detach()
-            with torch.no_grad():
-                x = netG(zk_prior)
-            cur_samples = x
-            fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
-            for j, sample in enumerate(fid_samples):
-                torchvision.utils.save_image(
-                    sample, '{}/fid_chain_{:05d}.png'.format(img_dir, i * bs + j), 
-                    normalize=True)
+            for t, zk_prior in enumerate(z_l):
+                zk_prior = zk_prior.clone().detach()
+                with torch.no_grad():
+                    x = netG(zk_prior)
+                cur_samples = x
+                fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
+                for j, sample in enumerate(fid_samples):
+                    torchvision.utils.save_image(
+                        sample, '{}/fid_chain_{:05d}_{:04d}.png'.format(img_dir, i * bs + j, t), 
+                        normalize=True)
 
         en_l = np.hstack(en_l)
         np.save('en.npy', en_l)
