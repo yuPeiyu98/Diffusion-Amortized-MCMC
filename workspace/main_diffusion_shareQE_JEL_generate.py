@@ -90,20 +90,6 @@ def main(args):
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
-    
-    # pre-calculating statistics for fid calculation
-    start_time = time.time()
-    print("Begin calculating real image statistics")
-    fid_data_true = []
-    for x, _ in testloader:
-        fid_data_true.append(x)
-        if len(fid_data_true) >= args.n_fid_samples:
-            break
-    fid_data_true = torch.cat(fid_data_true, dim=0)
-    fid_data_true = (fid_data_true + 1.0) / 2.0
-    real_m, real_s = pfw.get_stats(fid_data_true, device="cuda:0")
-    print("Finish calculating real image statistics {:.3f}".format(time.time() - start_time), fid_data_true.shape, fid_data_true.min(), fid_data_true.max())
-    fid_data_true, testset, testloader = None, None, None
 
     # define models
     if args.dataset == 'cifar10':
@@ -141,17 +127,16 @@ def main(args):
         Q_dummy.load_state_dict(state_dict['Q_dummy_state_dict'])
         E.load_state_dict(state_dict['E_state_dict'])
         
-        fid_s_time = time.time()
-        
         dummy = torch.randn(3,3).cuda()
 
         bs = 64
+        fid_s_time = time.time()
         for i in range(10):
             cur_samples, _ = gen_samples_with_diffusion_prior(bs, dummy.device, Q, G)
             fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
             for j, sample in enumerate(fid_samples):
                 torchvision.utils.save_image(
-                    sample, save_name='{}/fid_diff_{:05d}.png'.format(img_dir, i * bs + j), 
+                    sample, '{}/fid_diff_{:05d}.png'.format(img_dir, i * bs + j), 
                     normalize=True)
         print("Finish calculating fid time {:.3f}".format(time.time() - fid_s_time))
 
@@ -162,7 +147,7 @@ def main(args):
             fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
             for j, sample in enumerate(fid_samples):
                 torchvision.utils.save_image(
-                    sample, save_name='{}/fid_ebm_{:05d}.png'.format(img_dir, i * bs + j), 
+                    sample, '{}/fid_ebm_{:05d}.png'.format(img_dir, i * bs + j), 
                     normalize=True)
         print("Finish calculating fid time {:.3f}".format(time.time() - fid_s_time))
 
@@ -182,13 +167,14 @@ def main(args):
             t = time.time() - mse_s_time
 
             mse_l_time = time.time()
+            zk_pos.requires_grad = True
             zk_pos = sample_langevin_post_z_with_prior(
                             z=zk_pos, x=x, netG=G, netE=E, g_l_steps=100, # if out_fid > fid_best else 40, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
-            print("Finish calculating mse Q time {:.3f} langevin time {:.3f}".format(t, mse_l_time))
+            print("Finish calculating mse Q time {:.3f} langevin time {:.3f}".format(t, time.time() - mse_l_time))
             break
 
 
