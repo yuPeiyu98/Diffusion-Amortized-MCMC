@@ -166,11 +166,11 @@ def main(args):
                 z_norm = 1.0 / 2.0 * torch.sum(z**2)
                 z_grad = torch.autograd.grad(en + z_norm, z)[0]
 
-                z.data = z.data - 0.5 * e_l_step_size * e_l_step_size * z_grad 
+                z.data = z.data - 0.5 * args.e_l_step_size * args.e_l_step_size * z_grad 
                 if True:
-                    z.data += e_l_step_size * torch.randn_like(z)
+                    z.data += args.e_l_step_size * torch.randn_like(z)
 
-                if (k % 100 == 0 or i == e_l_steps - 1):
+                if (k % 100 == 0 or k == args.e_l_steps - 1):
                     en_l.append(en_b)
                     z_l.append(z)
 
