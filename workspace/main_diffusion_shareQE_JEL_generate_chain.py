@@ -153,38 +153,37 @@ def main(args):
         bs = 64
         fid_s_time = time.time()
 
-        for i in range(10):
+        for i in range(2):
             en_l = []
             z_l = []
 
             z = torch.randn(bs, args.nz).cuda()
             z.requires_grad = True
 
-            for k in range(2500):
+            for k in range(200):
                 en = E(z).sum()
                 en_b = E(z).unsqueeze(1).detach().cpu().numpy()
+
+                if k % 10 == 0:
+                    en_l.append(en_b)
+                    z_l.append(z)
+
+                    zk_prior = z.clone().detach()
+                    with torch.no_grad():
+                        x = G(zk_prior)
+                    cur_samples = x
+                    fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
+                    for j, sample in enumerate(fid_samples):
+                        torchvision.utils.save_image(
+                            sample, '{}/fid_chain_{:05d}_{:04d}.png'.format(img_dir, i * bs + j, k // 10), 
+                            normalize=True)
 
                 z_norm = 1.0 / 2.0 * torch.sum(z**2)
                 z_grad = torch.autograd.grad(en + z_norm, z)[0]
 
                 z.data = z.data - 0.5 * args.e_l_step_size * args.e_l_step_size * z_grad 
                 if True:
-                    z.data += args.e_l_step_size * torch.randn_like(z)
-
-                if (k % 100 == 0 or k == args.e_l_steps - 1):
-                    en_l.append(en_b)
-                    z_l.append(z)
-
-            for t, zk_prior in enumerate(z_l):
-                zk_prior = zk_prior.clone().detach()
-                with torch.no_grad():
-                    x = G(zk_prior)
-                cur_samples = x
-                fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
-                for j, sample in enumerate(fid_samples):
-                    torchvision.utils.save_image(
-                        sample, '{}/fid_chain_{:05d}_{:04d}.png'.format(img_dir, i * bs + j, t), 
-                        normalize=True)
+                    z.data += args.e_l_step_size * torch.randn_like(z)                
 
             en_l = np.hstack(en_l)
             np.save('{}/en_{:04d}.npy'.format(img_dir, i), en_l)
