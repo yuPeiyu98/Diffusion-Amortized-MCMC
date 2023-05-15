@@ -153,15 +153,16 @@ def main(args):
         bs = 64
         fid_s_time = time.time()
 
-        en_l = []
-        z_l = []
         for i in range(10):
+            en_l = []
+            z_l = []
+
             z = torch.randn(bs, args.nz).cuda()
             z.requires_grad = True
 
             for k in range(2500):
                 en = E(z).sum()
-                en_b = E(z).detach().cpu().numpy()
+                en_b = E(z)..unsqueeze(1).detach().cpu().numpy()
 
                 z_norm = 1.0 / 2.0 * torch.sum(z**2)
                 z_grad = torch.autograd.grad(en + z_norm, z)[0]
@@ -185,8 +186,8 @@ def main(args):
                         sample, '{}/fid_chain_{:05d}_{:04d}.png'.format(img_dir, i * bs + j, t), 
                         normalize=True)
 
-        en_l = np.hstack(en_l)
-        np.save('en.npy', en_l)
+            en_l = np.hstack(en_l)
+            np.save('{}/en_{:04d}.npy'.format(img_dir, i), en_l)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
