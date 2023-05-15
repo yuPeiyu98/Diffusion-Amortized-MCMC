@@ -162,7 +162,7 @@ def main(args):
 
             for k in range(2500):
                 en = E(z).sum()
-                en_b = E(z)..unsqueeze(1).detach().cpu().numpy()
+                en_b = E(z).unsqueeze(1).detach().cpu().numpy()
 
                 z_norm = 1.0 / 2.0 * torch.sum(z**2)
                 z_grad = torch.autograd.grad(en + z_norm, z)[0]
