@@ -184,7 +184,7 @@ def main(args):
                     sample, '{}/fid_chain_{:05d}.png'.format(img_dir, i * bs + j), 
                     normalize=True)
 
-        en_l = np.vstack(en_l)
+        en_l = np.hstack(en_l)
         np.save('en.npy', en_l)
 
 if __name__ == "__main__":
