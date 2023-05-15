@@ -40,8 +40,8 @@ def main(args):
     timestamp = re.sub(r'[\:-]','', timestamp) # replace unwanted chars 
     timestamp = re.sub(r'[\s]','_', timestamp) # with regex and re.sub
     
-    img_dir = os.path.join(args.log_path, args.dataset, timestamp, 'imgs_test')
-    ckpt_dir = os.path.join(args.log_path, args.dataset, timestamp, 'ckpt')
+    img_dir = os.path.join(args.resume_path, 'imgs_test')
+    ckpt_dir = os.path.join(args.resume_path, 'ckpt')
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(ckpt_dir, exist_ok=True)
     shutil.copyfile(__file__, os.path.join(args.log_path, args.dataset, timestamp, osp.basename(__file__)))
@@ -126,6 +126,7 @@ def main(args):
         with torch.no_grad():
             x_hat = G(zk_pos)
 
+        bs = x_hat.size(0)
         cur_samples = x_hat.detach()
         fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
         obs_samples = (1.0 + torch.clamp(x, min=-1.0, max=1.0)) / 2.0
