@@ -17,7 +17,7 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import MNIST
-from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netE, _netQ, _netQ_uncond, _netQ_U
+from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ, _netQ_uncond, _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, gen_samples
 
@@ -86,6 +86,25 @@ def main(args):
         trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'celeba64_train'), transform=transform_train)
         testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'celeba64_train'), transform=transform_test) 
         mset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'celeba64_test'), transform=transform_test)
+    elif args.dataset == 'celebaHQ':
+        args.nz = 128
+        args.ngf = 128
+
+        transform_train = transforms.Compose([
+            transforms.Resize(256),
+            transforms.RandomHorizontalFlip(),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+        transform_test = transforms.Compose([
+            transforms.Resize(256),
+            transforms.ToTensor(),
+            transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+        ])
+
+        trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_train)
+        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'val'), transform=transform_test) 
+        mset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'test'), transform=transform_test)
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
@@ -98,6 +117,8 @@ def main(args):
         G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
     elif args.dataset == 'celeba64':
         G = _netG_celeba64(nz=args.nz, ngf=args.ngf, nc=args.nc)
+    elif args.dataset == 'celebaHQ':
+        G = _netG_celebaHQ(nz=args.nz, ngf=args.ngf, nc=args.nc)
     Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
