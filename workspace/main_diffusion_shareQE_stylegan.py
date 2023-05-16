@@ -100,12 +100,21 @@ def main(args):
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
+    Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, \
+        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
+        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
+        net_arch='A', dataset=args.dataset, weight_path=args.pretrained_E_path)
+
+    for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
+        target_param.data.copy_(param.data)
 
     E = _netE(nz=args.nz, e_sn=False)
     F = PerceptualModel(weight_path=args.pretrained_F_path)
 
     G.cuda()
     Q.cuda()
+    Q_dummy.cuda()
+    Q_dummy.eval()
     E.cuda()
     F.cuda()
 
@@ -149,8 +158,8 @@ def main(args):
         E.eval()
         # infer z from given x
         with torch.no_grad():
-            __, z0 = Q(x)
-        zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
+            z0_, z0 = Q_dummy(x)
+        zk_pos, zk_neg = z0_.detach().clone(), z0_.detach().clone()
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
 
@@ -200,6 +209,11 @@ def main(args):
                 Q_param_group['lr'] = q_lr
             for E_param_group in E_optimizer.param_groups:
                 E_param_group['lr'] = e_lr
+
+        if (iteration + 1) % 10 == 0:
+            # Update the frozen target models
+            for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
+                target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
 
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} e_loss {:.3f} e_pos {:.3f} e_neg {:.3f} q_lr {:.8f}".format(
@@ -326,7 +340,7 @@ if __name__ == "__main__":
 
     # optimizing parameters
     parser.add_argument('--g_lr', type=float, default=2e-4, help='learning rate for generator')
-    parser.add_argument('--e_lr', type=float, default=5e-4, help='learning rate for latent ebm')
+    parser.add_argument('--e_lr', type=float, default=5e-5, help='learning rate for latent ebm')
     parser.add_argument('--q_lr', type=float, default=1e-4, help='learning rate for inference model Q')
     parser.add_argument('--q_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
     parser.add_argument('--e_is_grad_clamp', type=bool, default=True, help='whether doing the gradient clamp')
