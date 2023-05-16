@@ -95,6 +95,20 @@ def main(args):
     E.cuda()
     F.cuda()
 
+    # pre-calculating statistics for fid calculation
+    start_time = time.time()
+    print("Begin calculating real image statistics")
+    fid_data_true = []
+    for x, _ in testloader:
+        fid_data_true.append(x)
+        if len(fid_data_true) >= args.n_fid_samples:
+            break
+    fid_data_true = torch.cat(fid_data_true, dim=0)
+    fid_data_true = (fid_data_true + 1.0) / 2.0
+    real_m, real_s = pfw.get_stats(fid_data_true, device="cuda:0")
+    print("Finish calculating real image statistics {:.3f}".format(time.time() - start_time), fid_data_true.shape, fid_data_true.min(), fid_data_true.max())
+    fid_data_true, testset, testloader = None, None, None
+
     start_iter = 0
     fid_best = 10000
     mse_best = 10000
@@ -125,21 +139,31 @@ def main(args):
 
         with torch.no_grad():
             x_hat = G(zk_pos)
+            g_loss = torch.mean((x_hat - x) ** 2, dim=[1, 2, 3]).sum()
+            mse_lss += g_loss.item()
 
-        bs = x_hat.size(0)
-        cur_samples = x_hat.detach()
-        fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
-        obs_samples = (1.0 + torch.clamp(x, min=-1.0, max=1.0)) / 2.0
-        for j, sample in enumerate(fid_samples):
-            torchvision.utils.save_image(
-                sample, '{}/recon_{:05d}.png'.format(img_dir, i * bs + j), 
-                normalize=True)
-            torchvision.utils.save_image(
-                obs_samples[j], '{}/obs_{:05d}.png'.format(img_dir, i * bs + j), 
-                normalize=True)
-        i += 1
+        samples.append(x_hat.detach().clone())
 
-            
+        # bs = x_hat.size(0)
+        # cur_samples = x_hat.detach()
+        # fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
+        # obs_samples = (1.0 + torch.clamp(x, min=-1.0, max=1.0)) / 2.0
+        # for j, sample in enumerate(fid_samples):
+        #     torchvision.utils.save_image(
+        #         sample, '{}/recon_{:05d}.png'.format(img_dir, i * bs + j), 
+        #         normalize=True)
+        #     torchvision.utils.save_image(
+        #         obs_samples[j], '{}/obs_{:05d}.png'.format(img_dir, i * bs + j), 
+        #         normalize=True)
+        # i += 1
+
+    mse_lss /= len(mset)
+
+    fid_s_time = time.time()
+    out_fid = calculate_fid_with_samples(
+                fid_samples=samples,
+                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+    print("Finish calculating fid time {:.3f} fid {:.3f} MSE {:.3f}".format(time.time() - fid_s_time, out_fid, mse_lss))
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
