@@ -162,7 +162,7 @@ def main(args):
     fid_s_time = time.time()
     out_fid = calculate_fid_with_samples(
                 fid_samples=samples,
-                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration))
+                real_m=real_m, real_s=real_s, save_name='{}/fid_samples_test.png'.format(img_dir))
     print("Finish calculating fid time {:.3f} fid {:.3f} MSE {:.3f}".format(time.time() - fid_s_time, out_fid, mse_lss))
 
 if __name__ == "__main__":
