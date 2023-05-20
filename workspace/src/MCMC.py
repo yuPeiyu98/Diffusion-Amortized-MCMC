@@ -154,9 +154,12 @@ def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = 
         mystr += "{}/{:.3f}/{:.3f}/{:.3f} ".format(
             i, g_log_lkhd.item(), f_l.item(), en.item())
 
-    if verbose:
-        print("Log posterior sampling.")
-        print(mystr)
+    print("Log posterior sampling.")
+    print(mystr)
+    
+    # if verbose:
+    #     print("Log posterior sampling.")
+    #     print(mystr)
 
     set_requires_grad(netE, requires_grad=True)
     return z.detach()

@@ -154,6 +154,8 @@ def main(args):
             w = G.net.truncation(w)
             x = G.net.synthesis(w)
 
+            z_ = w.reshape(x.size(0), -1)
+
         z_mask_prob = torch.rand((len(x),), device=x.device)
         z_mask = torch.ones(len(x), device=x.device)
         z_mask[z_mask_prob < p_mask] = 0.0
@@ -165,7 +167,7 @@ def main(args):
         # infer z from given x
         # with torch.no_grad():
         #     z0_, z0 = Q_dummy(x)
-        zk_pos, zk_neg = w.detach().clone(), w.detach().clone()
+        zk_pos, zk_neg = z_.detach().clone(), z_.detach().clone()
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
 
@@ -187,7 +189,7 @@ def main(args):
         # E grad. cumul.
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = (e_pos.mean() - e_neg.mean()) + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4
+        E_loss = (e_pos.mean() - e_neg.mean()) + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
@@ -229,7 +231,7 @@ def main(args):
         if iteration % args.plot_iter == 0:
             # reconstruction
             with torch.no_grad():
-                x_hat_q = G(z0)
+                x_hat_q = G(zk_pos)
                 save_images = x[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_obs.png'.format(img_dir, iteration), normalize=True, nrow=8)
                 save_images = x_hat[:64].detach().cpu()
@@ -237,7 +239,7 @@ def main(args):
                 save_images = x_hat_q[:64].detach().cpu()
                 torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
             # samples
-            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=64, device=z0.device, netQ=Q, netG=G) 
+            samples, _ = gen_samples_with_diffusion_prior_stylegan(b=64, device=zk_pos.device, netQ=Q, netG=G) 
             save_images = samples[:64].detach().cpu()
             torchvision.utils.save_image(torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_prior.png'.format(img_dir, iteration), normalize=True, nrow=8)
         
@@ -357,8 +359,8 @@ if __name__ == "__main__":
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
     parser.add_argument('--print_iter', type=int, default=1, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
-    parser.add_argument('--ckpt_iter', type=int, default=500, help='number of iterations between each ckpt saving')
-    parser.add_argument('--fid_iter', type=int, default=15, help='number of iterations between each fid computation')
+    parser.add_argument('--ckpt_iter', type=int, default=1000, help='number of iterations between each ckpt saving')
+    parser.add_argument('--fid_iter', type=int, default=100, help='number of iterations between each fid computation')
 
     args = parser.parse_args()
     main(args)
