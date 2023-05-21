@@ -144,7 +144,7 @@ def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = 
         ma = (g_log_lkhd == torch.nan).unsqueeze(1).float()
 
     z = z * (1 - ma) + torch.randn_like(z) * ma
-    z.requires_grad = True
+    # z.requires_grad = True
 
     optimizer = torch.optim.Adam([z], lr=g_l_step_size)
 
