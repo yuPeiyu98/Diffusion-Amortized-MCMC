@@ -127,11 +127,7 @@ def main(args):
     if args.resume_path is not None:
         print('load from ', args.resume_path)
         state_dict = torch.load(args.resume_path)
-        G.load_state_dict(state_dict['G_state_dict'])
-        Q.load_state_dict(state_dict['Q_state_dict'])
-        G_optimizer.load_state_dict(state_dict['G_optimizer'])
-        Q_optimizer.load_state_dict(state_dict['Q_optimizer'])
-        start_iter = state_dict['iter'] + 1
+        Q_dummy.load_state_dict(state_dict['Q_state_dict'])
     
     q_lr = args.q_lr
     e_lr = args.e_lr
@@ -148,13 +144,13 @@ def main(args):
         x = x.cuda()
         # print(idx)
 
-        with torch.no_grad():
-            z = torch.randn(x.size(0), 512).cuda()
-            w = G.net.mapping(z, l=None)
-            w = G.net.truncation(w)
-            x = G.net.synthesis(w)
+        # with torch.no_grad():
+        #     z = torch.randn(x.size(0), 512).cuda()
+        #     w = G.net.mapping(z, l=None)
+        #     w = G.net.truncation(w)
+        #     x = G.net.synthesis(w)
 
-            z_ = w.reshape(x.size(0), -1)
+        #     z_ = w.reshape(x.size(0), -1)
 
         z_mask_prob = torch.rand((len(x),), device=x.device)
         z_mask = torch.ones(len(x), device=x.device)
@@ -165,15 +161,27 @@ def main(args):
         G.eval()
         E.eval()
         # infer z from given x
-        # with torch.no_grad():
-        #     z0_, z0 = Q_dummy(x)
+        with torch.no_grad():
+            z0_, z0 = Q_dummy(x)
+
+            x_hat = G(z0_)
+            g_log_lkhd = torch.mean((x_hat - x) ** 2, dim=[1,2,3])
+            m = torch.isnan(g_log_lkhd).unsqueeze(1).expand(z.size(0), z.size(1))
+
+            # t = torch.randn(x.size(0), 512).cuda()
+            # w = netG.net.mapping(t, l=None)
+            # w = netG.net.truncation(w)
+            # w = w.reshape(x.size(0), -1)
+            w = torch.randn_like(z0_)
+
+        z_ = torch.where(m, w, z0_)
         zk_pos, zk_neg = z_.detach().clone(), z_.detach().clone()
         zk_pos.requires_grad = True
         zk_neg.requires_grad = True
 
-        # zk_pos = sample_invert_z(
-        #     z=zk_pos, x=x, netG=G, netF=F, netE=E,
-        #     g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
+        zk_pos = sample_invert_z(
+            z=zk_pos, x=x, netG=G, netF=F, netE=E,
+            g_l_steps=args.g_l_steps, g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         zk_neg = sample_langevin_prior_z(
             z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
             netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
@@ -307,7 +315,7 @@ if __name__ == "__main__":
     parser.add_argument('--dataset', type=str, default='lsun_tower')
     parser.add_argument('--log_path', type=str, default='../logs/', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../../datasets/', help='data path')
-    parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
+    parser.add_argument('--resume_path', type=str, default='../logs/', help='pretrained ckpt path for resuming training')
     parser.add_argument('--pretrained_G_path', type=str, default='../../idinvert/', 
                                                          help='pretrained ckpt path for generator')
     parser.add_argument('--pretrained_E_path', type=str, default='../../idinvert/', 

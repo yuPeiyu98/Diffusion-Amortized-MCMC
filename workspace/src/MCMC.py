@@ -141,10 +141,16 @@ def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = 
     with torch.no_grad():
         x_hat = netG(z)
         g_log_lkhd = torch.mean((x_hat - x) ** 2, dim=[1,2,3])
-        ma = (g_log_lkhd == torch.nan).unsqueeze(1).float()
+        m = torch.isnan(g_log_lkhd).unsqueeze(1).expand(z.size(0), z.size(1))
 
-    z = z * (1 - ma) + torch.randn_like(z) * ma
-    # z.requires_grad = True
+        t = torch.randn(x.size(0), 512).cuda()
+        w = netG.net.mapping(t, l=None)
+        w = netG.net.truncation(w)
+        w = w.reshape(x.size(0), -1)
+
+    z_ = torch.where(m, w, z)
+    z = z_.detach().clone()
+    z.requires_grad = True
 
     optimizer = torch.optim.Adam([z], lr=g_l_step_size)
 
@@ -164,7 +170,7 @@ def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = 
         mystr += "{}/{:.3f}/{:.3f}/{:.3f} ".format(
             i, g_log_lkhd.item(), f_l.item(), 0)
     
-    if True:
+    if verbose:
         print("Log posterior sampling.")
         print(mystr)
 
