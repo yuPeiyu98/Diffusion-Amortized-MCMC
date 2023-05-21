@@ -141,7 +141,7 @@ def sample_invert_z(z, x, netG, netF, netE, g_l_steps, g_l_step_size, verbose = 
     with torch.no_grad():
         x_hat = netG(z)
         g_log_lkhd = torch.mean((x_hat - x) ** 2, dim=[1,2,3])
-        ma = (g_log_lkhd == torch.nan).unsqueeze(1)
+        ma = (g_log_lkhd == torch.nan).unsqueeze(1).float()
 
     z = z * (1 - ma) + torch.randn_like(z) * ma
     z.requires_grad = True
