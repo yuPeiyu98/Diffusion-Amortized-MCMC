@@ -174,9 +174,8 @@ def main(args):
 
         if iteration % args.print_iter == 0:
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} e_loss {:.3f} e_pos {:.3f} e_neg {:.3f} q_lr {:.8f}".format(
-                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), 
-                E_loss.item(), e_pos.mean().item(), e_neg.mean().item(), q_lr))
-            print(zk_pos.max(), zk_pos.min())
+                iteration, time.time() - start_time, 0.0, Q_loss.item(), 
+                0.0, 0.0, 0.0, q_lr))
         
         if iteration > 0 and iteration % args.ckpt_iter == 0:
             print('Saving checkpoint')
