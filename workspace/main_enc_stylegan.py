@@ -99,16 +99,19 @@ def main(args):
 
     G = StyleGANGenerator(weight_path=args.pretrained_G_path)
     Q = StyleGANEncoder(weight_path=args.pretrained_E_path, load=False, resolution=256)
+    Q_dummy = StyleGANEncoder(weight_path=args.pretrained_E_path)
 
     E = _netE(nz=args.nz, e_sn=False)
     F = PerceptualModel(weight_path=args.pretrained_F_path)
 
     G.cuda()
     Q.cuda()
+    Q_dummy.cuda()
     E.cuda()
     F.cuda()
 
     G.eval()
+    Q_dummy.eval()
     E.eval()
     F.eval()
 
@@ -145,8 +148,11 @@ def main(args):
         Q.train()
         
         z = Q(x)
+        with torch.no_grad():
+        	z_hat = Q_dummy(x)
         
-        Q_loss = torch.mean((G(z) - x) ** 2) + torch.mean((netF(x) - netF(x_hat)) ** 2, dim=[1,2,3]).mean() * 5e-5 
+        # Q_loss = torch.mean((G(z) - x) ** 2) + torch.mean((netF(x) - netF(x_hat)) ** 2, dim=[1,2,3]).mean() * 5e-5 
+        Q_loss = torch.mean((z - z_hat) ** 2)
         Q_loss.backward()
         if args.q_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
