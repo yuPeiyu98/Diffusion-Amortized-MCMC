@@ -133,10 +133,10 @@ def Leapfrog(x, energy, step_size, L=3):
     p = p0 - 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
     _x = _x + step_size * p
     for __ in range(L):
-        p = p + step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+        p = p - step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
         _x = _x + step_size * p
     # the last half-step update for the momentum    
-    p = p + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+    p = p - 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
 
     # Metropolis-Hastings Correction
     H0 = energy(x) + 0.5 * torch.sum(p0.square().view(p0.size(0), -1), 1)
