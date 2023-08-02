@@ -112,6 +112,71 @@ def sample_langevin_prior_z_mh(z, netE, g_l_steps, g_l_step_size, g_l_with_noise
         print(mystr)
     return z_0.detach()
 
+##### + HMC 
+def Leapfrog(x, energy, step_size, L=3):
+    """ Leapfrog integrator using Euclidean-Gaussian kinematic energy
+
+    Args:
+        x        -- initial samples
+        energy   -- potential energy term U()
+        L        -- iterations for leapfrog integrator
+        stp_size -- step size for leapfrog integrator 
+
+    It returns the (possibly) updated sample and the acceptance rate 
+    of this batch data
+    """        
+    # initialize the dynamics and the momentum
+    p0, _x = torch.randn_like(x), x.clone().detach().requires_grad_(True)
+    
+    # first half-step update for the momentum and 
+    # the full step update for the data
+    p = p0 + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+    _x = _x + step_size * p
+    for __ in range(L):
+        p = p + step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+        _x = _x + step_size * p
+    # the last half-step update for the momentum    
+    p = p + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+
+    # Metropolis-Hastings Correction
+    H0 = -energy(x) + 0.5 * torch.sum(p0.square().view(p0.size(0), -1), 1)
+    H1 = -energy(_x) + 0.5 * torch.sum(p.square().view(p.size(0), -1), 1)    
+    p_acc = torch.minimum(torch.ones_like(H0), torch.exp(H0 - H1))
+    replace_idx = p_acc > torch.rand_like(p_acc)
+    x[replace_idx] = _x[replace_idx].detach().clone()
+
+    acc_rate = torch.mean(replace_idx.float()).item()
+
+    return x, acc_rate
+
+def _en(netE, z):
+    z_n = 1.0 / 2.0 * torch.sum(z**2, dim=1) 
+    en = netE(z)
+    total_en = en + z_n
+
+    return total_en
+
+def _hmc_prior_sampler(z, netE, e_l_steps, e_l_step_size, e_l_with_noise):
+    set_requires_grad(netE, requires_grad=False)
+
+    z_hat = z.clone()
+
+    # hmc sampling
+    step_sz = e_l_step_size
+    for __ in range(e_l_step_size):
+        z_hat, acc_rate = Leapfrog(
+                            x=z_hat.detach(), energy=partial(_en, netE=netE), 
+                            step_size=step_sz, L=3
+                          )
+        if acc_rate > 0.651:
+            step_sz *= 1.02
+        else:
+            step_sz /= 1.02
+        
+    set_requires_grad(netE, requires_grad=True)        
+
+    return z_hat
+
 def sample_langevin_prior_nce_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, verbose=False):
     mystr = "Step/en/z_norm: "
     for i in range(e_l_steps):
@@ -563,8 +628,12 @@ def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     zk_prior.requires_grad = True
     # zk_prior = sample_langevin_prior_z(
     #     z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
-    zk_prior = sample_langevin_prior_z_mh(
-        z=zk_prior, netE=netE, g_l_steps=e_l_steps, g_l_step_size=e_l_step_size, g_l_with_noise=e_l_with_noise, verbose=False)
+
+    ### + this one seems wrong
+    # zk_prior = sample_langevin_prior_z_mh(
+    #     z=zk_prior, netE=netE, g_l_steps=e_l_steps, g_l_step_size=e_l_step_size, g_l_with_noise=e_l_with_noise, verbose=False)
+
+    zk_prior = _hmc_prior_sampler(z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size)
     with torch.no_grad():
         x = netG(zk_prior)
     return x
