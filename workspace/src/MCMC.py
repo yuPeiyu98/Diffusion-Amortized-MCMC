@@ -50,7 +50,7 @@ def sample_langevin_prior_z_mh(z, netE, g_l_steps, g_l_step_size, g_l_with_noise
     g_l_step_size_ = g_l_step_size
 
     ##### initial k0 state
-    x_hat = netG(z)
+    # x_hat = netG(z)
     z_n = 1.0 / 2.0 * torch.sum(z**2, dim=1) 
     en = netE(z)
     total_en = en + z_n
@@ -67,7 +67,7 @@ def sample_langevin_prior_z_mh(z, netE, g_l_steps, g_l_step_size, g_l_with_noise
         log_q_k1_k = - 0.5 * (noise ** 2).sum(dim=1) / (g_l_step_size ** 2)
 
         # k1 state
-        x_hat_ = netG(z_t)
+        # x_hat_ = netG(z_t)
         # g_log_lkhd_ = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat_ - x) ** 2, dim=[1, 2, 3])
         z_n_ = 1.0 / 2.0 * torch.sum(z_t**2, dim=1) 
         en_ = netE(z_t)
