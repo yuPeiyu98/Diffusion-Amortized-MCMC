@@ -149,7 +149,7 @@ def Leapfrog(x, energy, step_size, L=3):
 
     return x, acc_rate
 
-def _en(netE, z):
+def _en(z, netE):
     z_n = 1.0 / 2.0 * torch.sum(z**2, dim=1) 
     en = netE(z)
     total_en = en + z_n
