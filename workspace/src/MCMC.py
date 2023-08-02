@@ -561,8 +561,10 @@ def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sig
 def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     zk_prior = torch.randn(bs, nz).cuda()
     zk_prior.requires_grad = True
+    # zk_prior = sample_langevin_prior_z(
+    #     z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
     zk_prior = sample_langevin_prior_z_mh(
-        z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
+        z=zk_prior, netE=netE, g_l_steps=e_l_steps, g_l_step_size=e_l_step_size, g_l_with_noise=e_l_with_noise, verbose=False)
     with torch.no_grad():
         x = netG(zk_prior)
     return x
