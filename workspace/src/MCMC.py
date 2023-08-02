@@ -163,7 +163,7 @@ def _hmc_prior_sampler(z, netE, e_l_steps, e_l_step_size, e_l_with_noise):
 
     # hmc sampling
     step_sz = e_l_step_size
-    for __ in range(e_l_step_size):
+    for __ in range(e_l_steps):
         z_hat, acc_rate = Leapfrog(
                             x=z_hat.detach(), energy=partial(_en, netE=netE), 
                             step_size=step_sz, L=3
