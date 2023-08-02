@@ -156,6 +156,8 @@ def _en(netE, z):
 
     return total_en
 
+from functools import partial
+
 def _hmc_prior_sampler(z, netE, e_l_steps, e_l_step_size, e_l_with_noise):
     set_requires_grad(netE, requires_grad=False)
 
