@@ -130,7 +130,7 @@ def Leapfrog(x, energy, step_size, L=3):
     
     # first half-step update for the momentum and 
     # the full step update for the data
-    p = p0 + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
+    p = p0 - 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
     _x = _x + step_size * p
     for __ in range(L):
         p = p + step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
@@ -139,8 +139,8 @@ def Leapfrog(x, energy, step_size, L=3):
     p = p + 0.5 * step_size * torch.autograd.grad(energy(_x).sum(), _x)[0]
 
     # Metropolis-Hastings Correction
-    H0 = -energy(x) + 0.5 * torch.sum(p0.square().view(p0.size(0), -1), 1)
-    H1 = -energy(_x) + 0.5 * torch.sum(p.square().view(p.size(0), -1), 1)    
+    H0 = energy(x) + 0.5 * torch.sum(p0.square().view(p0.size(0), -1), 1)
+    H1 = energy(_x) + 0.5 * torch.sum(p.square().view(p.size(0), -1), 1)    
     p_acc = torch.minimum(torch.ones_like(H0), torch.exp(H0 - H1))
     replace_idx = p_acc > torch.rand_like(p_acc)
     x[replace_idx] = _x[replace_idx].detach().clone()
