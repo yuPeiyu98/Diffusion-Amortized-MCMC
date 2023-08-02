@@ -633,7 +633,8 @@ def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     # zk_prior = sample_langevin_prior_z_mh(
     #     z=zk_prior, netE=netE, g_l_steps=e_l_steps, g_l_step_size=e_l_step_size, g_l_with_noise=e_l_with_noise, verbose=False)
 
-    zk_prior = _hmc_prior_sampler(z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size)
+    zk_prior = _hmc_prior_sampler(
+        z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise)
     with torch.no_grad():
         x = netG(zk_prior)
     return x
