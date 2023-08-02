@@ -185,7 +185,9 @@ def main(args):
         zk_neg.requires_grad = True
 
         zk_pos = sample_langevin_post_z_with_gaussian(
-            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
+            # z=zk_pos,
+            z=torch.randn_like(zk_neg, requires_grad=True), 
+            x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
         
         for __ in range(6):

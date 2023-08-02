@@ -17,9 +17,11 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import MNIST
-from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ, _netQ_uncond, _netQ_U
+from src.vae_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ
+from src.vae_net import _netQ as _netE
+from src.diffusion_net import _netQ_U
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
-from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid
+from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, gen_samples, calculate_fid
 
 
 torch.multiprocessing.set_sharing_strategy('file_system')
@@ -103,7 +105,7 @@ def main(args):
         ])
 
         trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_train)
-        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'val'), transform=transform_test) 
+        testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_test) 
         mset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'test'), transform=transform_test)
 
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
@@ -134,16 +136,15 @@ def main(args):
         G = _netG_celeba64(nz=args.nz, ngf=args.ngf, nc=args.nc)
     elif args.dataset == 'celebaHQ':
         G = _netG_celebaHQ(nz=args.nz, ngf=args.ngf, nc=args.nc)
-    NF = 4
-    Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nf=NF, nif=args.nif, \
+    Q = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset)
-    Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nf=NF, nif=args.nif, \
+    Q_dummy = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset)
-    Q_eval = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nf=NF, nif=args.nif, \
+    Q_eval = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset)
@@ -152,7 +153,10 @@ def main(args):
     for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
         target_param.data.copy_(param.data)
 
-    E = _netE(nz=args.nz)
+    E = _netE(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
+        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
+        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
+        net_arch='A', dataset=args.dataset)
 
     G.cuda()
     Q.cuda()
@@ -202,22 +206,23 @@ def main(args):
         G.eval()
         E.eval()
         # infer z from given x
-        with torch.no_grad():
-            z0 = Q_dummy(x)
-            zp = Q(x=None, b=x.size(0), device=x.device)
-        zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
-        zk_pos.requires_grad = True
-        zk_neg.requires_grad = True
-
-        zk_pos = sample_langevin_post_z_with_prior(
-            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=args.g_l_steps, g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=args.g_l_with_noise,
-            g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0))
-        zk_neg = sample_langevin_prior_z(
-            z=torch.cat([zk_neg, torch.randn_like(zk_neg, requires_grad=True)], dim=0), 
-            netE=E, e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, 
-            e_l_with_noise=args.e_l_with_noise, verbose=False)
-        # z_mask = torch.ones(len(x), device=x.device).unsqueeze(-1)
+        # with torch.no_grad():
+        #     z0 = Q_dummy(x)
+        #     zp = Q(x=None, b=x.size(0), device=x.device)
+        # zk_pos, zk_neg = z0.detach().clone(), z0.detach().clone()
+        # zk_pos.requires_grad = True
+        # zk_neg.requires_grad = True
         
+        # update E
+        E_optimizer.zero_grad()
+        E.train()
+        zk_pos, mu, lvar = E(x)
+        E_loss = E.calculate_loss(z=zk_pos, mu=mu, logvar=lvar)
+        E_loss.backward()
+        if args.e_is_grad_clamp:
+            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
+        E_optimizer.step()
+
         for __ in range(6):
             # update Q 
             Q_optimizer.zero_grad()
@@ -226,7 +231,7 @@ def main(args):
             # Q_loss_n = Q.calculate_loss(x=x, z=zk_neg, mask=1 - z_mask).mean()
             # Q_loss = Q_loss_p + Q_loss_n
 
-            Q_loss = Q.calculate_loss(x=x, z=zk_pos, mask=z_mask).mean()
+            Q_loss = Q.calculate_loss(x=x, z=zk_pos.detach(), mask=z_mask).mean()
             Q_loss.backward()
             if args.q_is_grad_clamp:
                 torch.nn.utils.clip_grad_norm_(Q.parameters(), max_norm=args.q_max_norm)
@@ -242,16 +247,6 @@ def main(args):
         if args.g_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(G.parameters(), max_norm=args.g_max_norm)
         G_optimizer.step()
-
-        # update E
-        E_optimizer.zero_grad()
-        E.train()
-        e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() # + (e_pos ** 2).mean() + (e_neg ** 2).mean()
-        E_loss.backward()
-        if args.e_is_grad_clamp:
-            torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
-        E_optimizer.step()
 
         Q.eval()
         G.eval()
@@ -323,7 +318,7 @@ def main(args):
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration), bs=args.batch_size)
             out_fid_ = calculate_fid(
                 n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
-                e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
+                e_l_steps=0, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"), bs=args.batch_size)
             if out_fid_ < fid_best_:
                 fid_best_ = out_fid_
@@ -343,7 +338,7 @@ def main(args):
                 }
                 torch.save(save_dict, os.path.join(ckpt_dir, 'best.pth.tar'))
             print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f} | ebm {:.3f} / {:.3f}".format(
-            	time.time() - fid_s_time, out_fid, fid_best, out_fid_, fid_best_))
+                time.time() - fid_s_time, out_fid, fid_best, out_fid_, fid_best_))
 
             mse_lss = 0.0
             mse_s_time = time.time()
@@ -370,7 +365,6 @@ def main(args):
             if mse_lss < mse_best:
                 mse_best = mse_lss
             print("Finish calculating mse time {:.3f} mse {:.3f} / {:.3f}".format(time.time() - mse_s_time, mse_lss, mse_best))
-
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

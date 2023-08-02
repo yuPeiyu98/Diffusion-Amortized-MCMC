@@ -738,7 +738,7 @@ class Diffusion_Unet(nn.Module):
             return out
 
 class Diffusion_UnetA(nn.Module):
-    def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False):
+    def __init__(self, nz=128, nxemb=128, ntemb=128, residual=False, nf=4):
         super().__init__()
         self.act = F.leaky_relu # F.silu
         self.nz = nz
@@ -756,9 +756,9 @@ class Diffusion_UnetA(nn.Module):
         self.B = nn.Parameter(data=torch.randn(nz, nz // 2), requires_grad=True)
         
         self.in_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(nz * 2, 128, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(128, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(nz * 2, 32 * nf, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(32 * nf, 64 * nf, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(64 * nf, 64 * nf, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),           
         ])
@@ -766,16 +766,16 @@ class Diffusion_UnetA(nn.Module):
 
         # self.mid_layer = ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb) 
         self.mid_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(64 * nf, 64 * nf, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(256, 256, nxemb, ntemb)
         ])
 
         self.out_layers = nn.ModuleList([
-            ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(128 * nf, 64 * nf, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
             # ConcatSquashLinearSkipCtx(512, 256, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(512, 128, nxemb, ntemb),
-            ConcatSquashLinearSkipCtx(256, nz, nxemb, ntemb)
+            ConcatSquashLinearSkipCtx(128 * nf, 32 * nf, nxemb, ntemb),
+            ConcatSquashLinearSkipCtx(64 * nf, nz, nxemb, ntemb)
         ])
 
     def input_emb(self, x):
@@ -924,7 +924,8 @@ class _netQ_U(nn.Module):
         nc=3, 
         nz=128, 
         nxemb=128, 
-        ntemb=128, 
+        ntemb=128,
+        nf=4, 
         nif=64, 
         diffusion_residual=False,
         n_interval=20,
@@ -956,13 +957,13 @@ class _netQ_U(nn.Module):
             self.encoder = Encoder_celebaHQ(nc=nc, nemb=nxemb, nif=nif)
 
         if net_arch == 'vanilla':
-            self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
+            self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
         elif net_arch == 'A':
-            self.p = Diffusion_UnetA(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
+            self.p = Diffusion_UnetA(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
         elif net_arch == 'B':
-            self.p = Diffusion_UnetB(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
+            self.p = Diffusion_UnetB(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
         elif net_arch == 'C':
-            self.p = Diffusion_UnetC(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual)
+            self.p = Diffusion_UnetC(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
 
         self.xemb = nn.Parameter(data=torch.randn(1, self.nxemb), requires_grad=True)
         self.prior_emb = nn.Sequential(
