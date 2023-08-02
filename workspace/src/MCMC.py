@@ -45,6 +45,73 @@ def sample_langevin_prior_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, v
     set_requires_grad(netE, requires_grad=True)
     return z.detach()
 
+def sample_langevin_prior_z_mh(z, netE, g_l_steps, g_l_step_size, g_l_with_noise, verbose = False):
+    mystr = "Step/en/z_norm: "
+    g_l_step_size_ = g_l_step_size
+
+    ##### initial k0 state
+    x_hat = netG(z)
+    z_n = 1.0 / 2.0 * torch.sum(z**2, dim=1) 
+    en = netE(z)
+    total_en = en + z_n
+    z_grad = torch.autograd.grad(total_en.sum(), z)[0]
+
+    z_0 = z.clone().detach()
+    z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
+    noise = g_l_step_size * torch.randn_like(z)
+    z_t = z + noise
+
+    z = z.detach()
+    for i in range(g_l_steps):
+        ##### mh adjustment
+        log_q_k1_k = - 0.5 * (noise ** 2).sum(dim=1) / (g_l_step_size ** 2)
+
+        # k1 state
+        x_hat_ = netG(z_t)
+        # g_log_lkhd_ = 1.0 / (2.0 * g_llhd_sigma * g_llhd_sigma) * torch.sum((x_hat_ - x) ** 2, dim=[1, 2, 3])
+        z_n_ = 1.0 / 2.0 * torch.sum(z_t**2, dim=1) 
+        en_ = netE(z_t)
+        total_en_ = en_ + z_n_
+        z_grad_ = torch.autograd.grad(total_en_.sum(), z_t)[0]
+
+        z_0_ = z_t.clone().detach()
+        z_ = z_t - 0.5 * g_l_step_size * g_l_step_size * z_grad_
+        log_q_k_k1 = - 0.5 * torch.sum((z_0 - z_) ** 2, dim=1) / (g_l_step_size ** 2)
+
+        # ad-rj
+        prop = - total_en_ + log_q_k_k1 + total_en - log_q_k1_k
+        p_acc = torch.minimum(torch.ones_like(prop), torch.exp(prop))
+        replace_idx = p_acc >= torch.rand_like(p_acc)
+        acc_rate = torch.mean(replace_idx.float()).item()
+
+        ##### update status
+        if acc_rate < 0.574:
+            g_l_step_size *= 2
+        else:
+            g_l_step_size *= 0.5
+
+        if acc_rate < .1:
+            z_0 = torch.randn_like(z)
+            z = torch.randn_like(z)
+            noise = g_l_step_size * torch.randn_like(z)
+            z_t = torch.randn_like(z, requires_grad=True)
+
+            g_l_step_size = g_l_step_size_
+        else:
+            z_0[replace_idx] = z_0_[replace_idx]
+            z[replace_idx] = z_[replace_idx].detach()
+            noise = g_l_step_size * torch.randn_like(z)
+            z_t = (z + noise).requires_grad_(True)
+
+        mystr += "{}/{:.3f}/{:.3f}/{:.3f}/{:.8f}/{:.3f}  ".format(
+            i, en_.mean().item(), 0, 
+            z_n_.mean().item(), z_grad_.mean().item(), acc_rate)
+
+    if verbose:
+        print("Log posterior sampling.")
+        print(mystr)
+    return z_0.detach()
+
 def sample_langevin_prior_nce_z(z, netE, e_l_steps, e_l_step_size, e_l_with_noise, verbose=False):
     mystr = "Step/en/z_norm: "
     for i in range(e_l_steps):
@@ -494,7 +561,7 @@ def sample_langevin_post_z_with_diffgrad(z, x, netG, netE, g_l_steps, g_llhd_sig
 def gen_samples(bs, nz, netE, netG, e_l_steps, e_l_step_size, e_l_with_noise):
     zk_prior = torch.randn(bs, nz).cuda()
     zk_prior.requires_grad = True
-    zk_prior = sample_langevin_prior_z(
+    zk_prior = sample_langevin_prior_z_mh(
         z=zk_prior, netE=netE, e_l_steps=e_l_steps, e_l_step_size=e_l_step_size, e_l_with_noise=e_l_with_noise, verbose=False)
     with torch.no_grad():
         x = netG(zk_prior)
