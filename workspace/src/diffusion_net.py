@@ -1060,6 +1060,147 @@ class _netQ_U(nn.Module):
 
         return loss_T
 
+class _netQ_U_toy(nn.Module):
+    def __init__(self, 
+        nc=3, 
+        nz=2, 
+        nxemb=128, 
+        ntemb=128,
+        nf=4, 
+        nif=64, 
+        diffusion_residual=False,
+        n_interval=20,
+        logsnr_min=-20.,
+        logsnr_max=20., 
+        var_type='small', # try 'large', 'small'
+        with_noise=False, 
+        cond_w=0,
+        net_arch='A',
+        dataset='cifar10'
+    ):
+
+        super().__init__()
+        print("Conditional model Q", with_noise)
+        self.n_interval = n_interval
+        self.logsnr_min = logsnr_min
+        self.logsnr_max = logsnr_max
+        self.var_type = var_type
+        self.nz = nz
+        self.nxemb = nxemb
+        self.with_noise = with_noise
+        
+        self.encoder = nn.Sequential(
+            nn.Linear(2, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, nxemb)
+        )
+
+        if net_arch == 'vanilla':
+            self.p = Diffusion_Unet(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
+        elif net_arch == 'A':
+            self.p = Diffusion_UnetA(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
+        elif net_arch == 'B':
+            self.p = Diffusion_UnetB(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
+        elif net_arch == 'C':
+            self.p = Diffusion_UnetC(nz=nz, nxemb=nxemb, ntemb=ntemb, residual=diffusion_residual, nf=nf)
+
+        self.xemb = nn.Parameter(data=torch.randn(1, self.nxemb), requires_grad=True)
+        self.prior_emb = nn.Sequential(
+            nn.Linear(nz, 128),
+            nn.LeakyReLU(),
+            nn.Linear(128, nxemb)
+        )
+
+        self.cond_w = cond_w
+
+    def forward(self, x=None, b=None, device=None, cond_w=-1):
+        # give x infer z
+        if x is not None:
+            assert b is None and device is None
+            b = len(x)
+            xemb = self.encoder(x)
+            device = x.device
+        else:
+            # xemb = torch.zeros(b, self.nxemb).to(device)
+            # xemb = self.xemb.expand(b, -1)
+            xemb = self.prior_emb(torch.randn(b, self.nz, device=device))
+
+        zt = torch.randn(b, self.nz).to(device)
+        #print('zt', zt.max(), zt.min())
+        for i in reversed(range(0, self.n_interval)):
+            i_tensor = torch.ones(b, dtype=torch.float).to(device) * float(i)
+            logsnr_t = logsnr_schedule_fn(i_tensor / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
+            logsnr_s = logsnr_schedule_fn(torch.clamp(i_tensor - 1.0, min=0.0) / (self.n_interval - 1.), logsnr_min=self.logsnr_min, logsnr_max=self.logsnr_max)
+            eps_pred = self.p(z=zt, logsnr=logsnr_t, xemb=xemb)
+
+            if x is not None and cond_w > 0:
+                # eps_pred_unc = self.p(z=zt, logsnr=logsnr_t, xemb=torch.zeros(b, self.nxemb).to(device))
+                xemb_unc = self.prior_emb(torch.randn(b, self.nz, device=device))
+                eps_pred_unc = self.p(z=zt, logsnr=logsnr_t, xemb=xemb_unc)
+                eps_pred = (1 + cond_w) * eps_pred - cond_w * eps_pred_unc
+            
+            #print('eps', i, eps_pred.max(), eps_pred.min())
+            logsnr_t = logsnr_t.reshape((b, 1))
+            logsnr_s = logsnr_s.reshape((b, 1))
+            pred_z = pred_x_from_eps(z=zt, eps=eps_pred, logsnr=logsnr_t)
+            #print('pred_z', i, pred_z.max(), pred_z.min())
+            #pred_z = torch.clamp(pred_z, min=-2.5, max=2.5)
+
+            if i == 0:
+                zt = pred_z
+            else:
+                z_s_dist = diffusion_reverse(x=pred_z, z_t=zt, logsnr_s=logsnr_s, logsnr_t=logsnr_t, pred_var_type=self.var_type)
+                eps = torch.randn_like(zt)
+                # if self.with_noise or x is None:
+                if self.with_noise:
+                    zt = z_s_dist['mean'] + z_s_dist['std'] * eps
+                else:
+                    zt = z_s_dist['mean']
+
+        return zt   
+        
+    def calculate_loss(self, x=None, z=None, mask=None):
+        # given inferred x and z train diffusion model
+        #assert len(x) == len(z)
+        assert z is not None
+        if x is not None: 
+            xemb = self.encoder(x)
+            if mask is not None:
+                # xemb = xemb * mask
+                # xemb = xemb * mask + self.xemb.expand(len(x), -1) * (1 - mask)
+                xemb = xemb * mask \
+                     + self.prior_emb(torch.randn(len(x), self.nz, device=x.device)) * (1 - mask)
+        else:
+            assert mask is None
+            # xemb = torch.zeros(len(z), self.nxemb).to(z.device)
+            # xemb = self.xemb.expand(len(x), -1)
+            xemb = self.prior_emb(torch.randn(len(z), self.nz, device=z.device))
+
+        u = torch.rand(len(z)).to(z.device)
+        logsnr = logsnr_schedule_fn(u, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
+
+        zt_dist = diffusion_forward(z, logsnr=logsnr.reshape(len(z), 1))
+        eps = torch.randn_like(z)
+        zt = zt_dist['mean'] + zt_dist['std'] * eps
+        eps_pred = self.p(z=zt, logsnr=logsnr, xemb=xemb)
+        assert eps.shape == eps_pred.shape == (len(z), self.nz)
+        loss = 0.5 * torch.sum((eps - eps_pred) ** 2, dim=1)
+
+        return loss
+
+    def calculate_reg(self, z):
+        # reg
+        u_T = torch.ones(len(z), device=z.device)
+        logsnr_T = logsnr_schedule_fn(u_T, logsnr_max=self.logsnr_max, logsnr_min=self.logsnr_min)
+        zt_dist_T = diffusion_forward(z, logsnr=logsnr_T.reshape(len(z), 1))
+        eps = torch.randn_like(z)
+        z_T = zt_dist_T['mean'] + zt_dist_T['std'] * eps
+        loss_T = 0.5 * torch.sum(z_T ** 2, dim=1)
+
+        return loss_T
+
 class _netQ_uncond(nn.Module):
     def __init__(self, 
         nc=3, 
