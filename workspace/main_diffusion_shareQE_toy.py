@@ -231,7 +231,7 @@ def main(args):
             fig = plt.figure(figsize=(8, 8))
             plt.xlim([low, high])
             plt.ylim([low, high])
-            plt.scatter(z_[:, 0], z_[:, 1], range=[[low, high], [low, high]])
+            plt.scatter(z_[:, 0], z_[:, 1])
             plt.axis('off')
             plt.gcf().set_size_inches(8, 8)
             plt.savefig(
