@@ -1,6 +1,7 @@
 # Use both diffusion model (seperate models) as prior and posterior
 
 import argparse
+import matplotlib.pyplot as plt
 import numpy as np
 import os
 import os.path as osp
