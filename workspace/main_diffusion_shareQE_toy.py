@@ -224,7 +224,7 @@ def main(args):
 
                 z_list.append(zk_pos)
 
-            z_ = torch.cat([z_list], dim=0).cpu().detach().numpy()
+            z_ = torch.cat(z_list, dim=0).cpu().detach().numpy()
 
             low, high = -4, 4
             fig = plt.figure(figsize=(8, 8))
