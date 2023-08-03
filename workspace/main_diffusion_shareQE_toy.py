@@ -221,7 +221,7 @@ def main(args):
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_mvn(
-                            z=zk_pos, x=x, g_l_steps=10, # if out_fid > fid_best else 40, 
+                            z=zk_pos, x=x, g_l_steps=100, # if out_fid > fid_best else 40, 
                             g_l_with_noise=True,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
