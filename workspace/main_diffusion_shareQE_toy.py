@@ -130,6 +130,8 @@ def main(args):
             print(mystr)
         return z.detach()
 
+    start_time = time.time()
+
     # begin training
     bs = 500
     for iteration in range(start_iter, args.iterations + 1):
@@ -243,7 +245,7 @@ def main(args):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--seed', type=int, default=1, help='random seed')
-    parser.add_argument('--dataset', type=str, default='cifar10')
+    parser.add_argument('--dataset', type=str, default='toy')
     parser.add_argument('--log_path', type=str, default='../logs/', help='log directory')
     parser.add_argument('--data_path', type=str, default='../../noise_mixture_nce/ncebm_torch/data', help='data path')
     parser.add_argument('--resume_path', type=str, default=None, help='pretrained ckpt path for resuming training')
