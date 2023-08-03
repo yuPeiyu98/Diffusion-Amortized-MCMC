@@ -87,8 +87,8 @@ def main(args):
     p_mask = args.p_mask
 
     S = np.array([
-    	[0.7, 0.6],
-    	[0.7, 0.8]
+        [0.7, 0.6],
+        [0.7, 0.8]
     ])
     S_inv = np.linalg.inv(S)
     L = np.linalg.cholesky(K)
@@ -98,39 +98,39 @@ def main(args):
     L_torch = torch.tensor(L).unsqueeze(0).cuda()
 
     def G(z):
-    	# z = torch.randn(bs, 2)
-    	return z + torch.matmul(L_torch, z.unsqueeze(2)).squeeze(2)
+        # z = torch.randn(bs, 2)
+        return z + torch.matmul(L_torch, z.unsqueeze(2)).squeeze(2)
 
     def log_p_x_z(z, mu):
-    	# z = torch.randn(bs, 2)
+        # z = torch.randn(bs, 2)
 
-    	# (bs, 1, 2)
-    	m0 = torch.matmul((z - mu).unsqueeze(1), S_inv_torch)
-    	# (bs, 1, 1)
-    	log_x_z = torch.matmul(m0, (z - mu).unsqueeze(2))
-    	return .5 * log_x_z.reshape(-1)
+        # (bs, 1, 2)
+        m0 = torch.matmul((z - mu).unsqueeze(1), S_inv_torch)
+        # (bs, 1, 1)
+        log_x_z = torch.matmul(m0, (z - mu).unsqueeze(2))
+        return .5 * log_x_z.reshape(-1)
 
     def sample_langevin_post_z_with_mvn(
-    		z, x, g_l_steps, g_l_with_noise, g_l_step_size, verbose = False
-    	):
-	    mystr = "Step/cross_entropy/recons_loss: "
+            z, x, g_l_steps, g_l_with_noise, g_l_step_size, verbose = False
+        ):
+        mystr = "Step/cross_entropy/recons_loss: "
   
-	    for i in range(g_l_steps):
-	        g_log_lkhd = log_p_x_z(z, x).sum()
-	        en = 1.0 / 2.0 * torch.sum(z**2)
-	        total_en = g_log_lkhd + en
-	        z_grad = torch.autograd.grad(total_en, z)[0]
+        for i in range(g_l_steps):
+            g_log_lkhd = log_p_x_z(z, x).sum()
+            en = 1.0 / 2.0 * torch.sum(z**2)
+            total_en = g_log_lkhd + en
+            z_grad = torch.autograd.grad(total_en, z)[0]
 
-	        z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
-	        if g_l_with_noise:
-	            z.data += g_l_step_size * torch.randn_like(z)
-	        mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}  ".format(
-	            i, en.item(), g_log_lkhd.item(), 
-	            z.mean().item(), (z_grad - z).mean().item())
-	    if verbose:
-	        print("Log posterior sampling.")
-	        print(mystr)
-	    return z.detach()
+            z.data = z.data - 0.5 * g_l_step_size * g_l_step_size * z_grad
+            if g_l_with_noise:
+                z.data += g_l_step_size * torch.randn_like(z)
+            mystr += "{}/{:.3f}/{:.3f}/{:.8f}/{:.8f}  ".format(
+                i, en.item(), g_log_lkhd.item(), 
+                z.mean().item(), (z_grad - z).mean().item())
+        if verbose:
+            print("Log posterior sampling.")
+            print(mystr)
+        return z.detach()
 
     # begin training
     bs = 500
@@ -205,12 +205,12 @@ def main(args):
             torch.save(save_dict, os.path.join(ckpt_dir, '{}.pth.tar'.format(iteration)))
         
         if iteration % args.fid_iter == 0:
-        	bs = 500
+            bs = 500
 
-        	z_list = []
+            z_list = []
             for i in range(10):
-				z = torch.randn(bs, 2).cuda()
-        		x = G(z).detach()
+                z = torch.randn(bs, 2).cuda()
+                x = G(z).detach()
 
                 with torch.no_grad():
                     z0 = Q(x)
@@ -228,18 +228,18 @@ def main(args):
 
             low, high = -4, 4
             fig = plt.figure(figsize=(8, 8))
-	        plt.xlim([low, high])
-	        plt.ylim([low, high])
-	        plt.scatter(z_[:, 0], z_[:, 1], range=[[low, high], [low, high]])
-	        plt.axis('off')
-	        plt.gcf().set_size_inches(8, 8)
-	        plt.savefig(
-	        	fname='{}/{}_post_Q.png'.format(img_dir, iteration), 
-	        	bbox_inches='tight', 
-	        	pad_inches=0, 
-	        	dpi=100
-	       	)
-	        plt.close()
+            plt.xlim([low, high])
+            plt.ylim([low, high])
+            plt.scatter(z_[:, 0], z_[:, 1], range=[[low, high], [low, high]])
+            plt.axis('off')
+            plt.gcf().set_size_inches(8, 8)
+            plt.savefig(
+                fname='{}/{}_post_Q.png'.format(img_dir, iteration), 
+                bbox_inches='tight', 
+                pad_inches=0, 
+                dpi=100
+            )
+            plt.close()
 
 
 if __name__ == "__main__":
