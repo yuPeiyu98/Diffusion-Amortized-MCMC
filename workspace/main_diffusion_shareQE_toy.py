@@ -89,7 +89,7 @@ def main(args):
         [0.7, 0.8]
     ])
     S_inv = np.linalg.inv(S)
-    L = np.linalg.cholesky(K)
+    L = np.linalg.cholesky(S)
 
     # (1, 2, 2)
     S_inv_torch = torch.tensor(S_inv).unsqueeze(0).cuda()
