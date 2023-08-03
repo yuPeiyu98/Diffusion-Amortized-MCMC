@@ -254,7 +254,7 @@ if __name__ == "__main__":
     parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
-    parser.add_argument('--nz', type=int, default=128, help='z vector length')
+    parser.add_argument('--nz', type=int, default=2, help='z vector length')
     parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
     parser.add_argument('--nif', type=int, default=64, help='base channel numbers in Q encoder')
     parser.add_argument('--nxemb', type=int, default=128, help='x embedding dimension in Q')
