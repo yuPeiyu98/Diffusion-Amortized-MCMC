@@ -62,9 +62,7 @@ def main(args):
     for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
         target_param.data.copy_(param.data)
 
-    G.cuda()
     Q.cuda()
-    E.cuda()
     Q_dummy.cuda()
     Q_eval.cuda()
 
