@@ -282,7 +282,7 @@ if __name__ == "__main__":
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
-    parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
+    parser.add_argument('--g_l_steps', type=int, default=50, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
     parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
