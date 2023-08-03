@@ -98,7 +98,8 @@ def main(args):
 
     def G(z):
         # z = torch.randn(bs, 2)
-        return z + torch.matmul(L_torch, z.unsqueeze(2)).squeeze(2)
+        u = torch.randn_like(z)
+        return z + torch.matmul(L_torch, u.unsqueeze(2)).squeeze(2)
 
     def log_p_x_z(z, mu):
         # z = torch.randn(bs, 2)
@@ -158,6 +159,8 @@ def main(args):
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0)
         )
         
+        g_loss = log_p_x_z(zk_pos, x).mean()
+
         for __ in range(6):
             # update Q 
             Q_optimizer.zero_grad()
@@ -191,7 +194,7 @@ def main(args):
             # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
             #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
-                iteration, time.time() - start_time, 0, Q_loss.item(), 0, q_lr))
+                iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), 0, q_lr))
             print(zk_pos.max(), zk_pos.min())
         
         if iteration > 0 and iteration % args.ckpt_iter == 0:
@@ -209,6 +212,8 @@ def main(args):
             bs = 500
 
             z_list = []
+
+            g_loss_sum = 0
             for i in range(10):
                 z = torch.randn(bs, 2).cuda()
                 x = G(z).detach()
@@ -223,7 +228,11 @@ def main(args):
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
+                g_loss_sum += log_p_x_z(zk_pos, x).sum()
+
                 z_list.append(zk_pos)
+
+            print("g_loss (avg): {:.8f}".format(g_loss_sum / (bs * 10)))
 
             z_ = torch.cat(z_list, dim=0).cpu().detach().numpy()
 
