@@ -180,8 +180,6 @@ def main(args):
         # learning rate schedule
         if (iteration + 1) % 1000 == 0:
             q_lr = max(q_lr * 0.99, 1e-5)
-            for G_param_group in G_optimizer.param_groups:
-                G_param_group['lr'] = g_lr
             for Q_param_group in Q_optimizer.param_groups:
                 Q_param_group['lr'] = q_lr
             
