@@ -92,8 +92,8 @@ def main(args):
     L = np.linalg.cholesky(S)
 
     # (1, 2, 2)
-    S_inv_torch = torch.tensor(S_inv).unsqueeze(0).cuda()
-    L_torch = torch.tensor(L).unsqueeze(0).cuda()
+    S_inv_torch = torch.tensor(S_inv).float().unsqueeze(0).cuda()
+    L_torch = torch.tensor(L).float().unsqueeze(0).cuda()
 
     def G(z):
         # z = torch.randn(bs, 2)
