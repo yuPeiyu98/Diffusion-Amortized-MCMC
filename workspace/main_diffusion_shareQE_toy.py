@@ -157,6 +157,8 @@ def main(args):
         rotations = np.stack([np.cos(angles), -np.sin(angles), np.sin(angles), np.cos(angles)])
         rotations = np.reshape(rotations.T, (-1, 2, 2))
 
+        return 2 * rng.permutation(np.einsum("ti,tij->tj", features, rotations))
+
     def plt_samples(
         samples, filename, npts=100, 
         low=-4, high=4, kde=True, kde_bw=.15
