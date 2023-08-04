@@ -77,7 +77,9 @@ def main(args):
     netG = G()
     netG.cuda()
 
-    def sample_z(batch_size):
+    def sample_z(batch_size, seed):
+        rng = np.random.RandomState(seed)
+
         radial_std = 0.3
         tangential_std = 0.1
         num_classes = 5
@@ -142,7 +144,7 @@ def main(args):
 
     bs = 5000
 
-    zk_pos = torch.tensor(sample_z(bs).float()).cuda()
+    zk_pos = torch.tensor(sample_z(bs, args.seed).float()).cuda()
     print(zk_pos.shape)
     x = netG(zk_pos) + torch.randn_like(zk_pos) * .25
     for i in range(10):
