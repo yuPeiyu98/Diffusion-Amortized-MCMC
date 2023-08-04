@@ -32,26 +32,28 @@ class G(nn.Module):
     def __init__(self):
         super(G, self).__init__()
 
-        self.l1 = nn.Linear(2, 128),
-        self.l2 = nn.Linear(128, 128)
-        self.l3 = nn.Linear(128, 128)
-        self.l4 = nn.Linear(128, 2)
+        self.net = nn.Sequential(
+            nn.Linear(2, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
+            nn.Linear(128, 2)
+        )
         
-        for m in [self.l1, self.l2, self.l3, self.l4]:
-            self.init_data(m)
-        
-    def init_data(self, module):
-        w = module.weight.data
-        b = module.bias.data
+        def init_weights(m):
+            if isinstance(m, nn.Linear):
+                w = m.weight.data
+                b = m.bias.data
 
-        module.weight.data.copy_(torch.randn_like(w) * 0.2)
-        module.bias.data.copy_(torch.randn_like(b) * 0.1)
+                m.weight.data.copy_(torch.randn_like(w) * 0.2)
+                m.bias.data.copy_(torch.randn_like(b) * 0.1)
+
+        self.net.apply(init_weights)    
 
     def forward(self, z):
-        z = F.relu(self.l1(z))
-        z = F.relu(self.l2(z))
-        z = F.relu(self.l3(z))
-        return self.l4(z)
+        return self.net(z)
 
 def main(args):
 
