@@ -126,6 +126,7 @@ def main(args):
     zk_pos = torch.randn(bs, 2).cuda()
     x = netG(zk_pos)
     for i in range(10):
+        zk_pos.requires_grad = True
         zk_pos = sample_langevin_post_z_with_mvn(
             zk_pos, x, 100, True, 0.2, verbose = False
         )
