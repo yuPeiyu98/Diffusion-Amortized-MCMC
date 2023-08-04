@@ -9,6 +9,7 @@ import random
 import time
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data as data
 import torchvision
@@ -26,6 +27,31 @@ from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffus
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 #################### training #####################################
+
+class G(nn.Module):
+    def __init__(self, args):
+        super(G, self).__init__()
+
+        self.l1 = nn.Linear(2, 128),
+        self.l2 = nn.Linear(128, 128)
+        self.l3 = nn.Linear(128, 128)
+        self.l4 = nn.Linear(128, 2)
+        
+        for m in [self.l1, self.l2, self.l3, self.l4]:
+            self.init_data(m)
+        
+    def init_data(self, module):
+        w = module.weight
+        b = module.bias
+
+        module.weight.data.copy_(torch.randn_like(w) * 0.2)
+        module.bias.data.copy_(torch.randn_like(b) * 0.1)
+
+    def forward(self, z):
+        z = F.relu(self.l1(z))
+        z = F.relu(self.l2(z))
+        z = F.relu(self.l3(z))
+        return self.l4(z)
 
 def main(args):
 
@@ -46,30 +72,7 @@ def main(args):
     os.makedirs(ckpt_dir, exist_ok=True)
     shutil.copyfile(__file__, os.path.join(args.log_path, args.dataset, timestamp, osp.basename(__file__)))
 
-    S = np.array([
-        [0.7, 0.6],
-        [0.7, 0.8]
-    ])
-    S_inv = np.linalg.inv(S)
-    L = np.linalg.cholesky(S)
-
-    # (1, 2, 2)
-    S_inv_torch = torch.tensor(S_inv).float().unsqueeze(0).cuda()
-    L_torch = torch.tensor(L).float().unsqueeze(0).cuda()
-
-    def G(z):
-        # z = torch.randn(bs, 2)
-        u = torch.randn_like(z)
-        return z + torch.matmul(L_torch, u.unsqueeze(2)).squeeze(2)
-
-    def log_p_x_z(z, mu):
-        # z = torch.randn(bs, 2)
-
-        # (bs, 1, 2)
-        m0 = torch.matmul((z - mu).unsqueeze(1), S_inv_torch)
-        # (bs, 1, 1)
-        log_x_z = torch.matmul(m0, (z - mu).unsqueeze(2))
-        return .5 * log_x_z.reshape(-1)
+    G.cuda()
 
     def sample_langevin_post_z_with_mvn(
             z, x, g_l_steps, g_l_with_noise, g_l_step_size, verbose = False
@@ -77,7 +80,8 @@ def main(args):
         mystr = "Step/cross_entropy/recons_loss: "
   
         for i in range(g_l_steps):
-            g_log_lkhd = log_p_x_z(z, x).sum()
+            x_hat = G(z)
+            g_log_lkhd = 1.0 / (2.0 * .25 ** 2) * torch.sum((x_hat - x) ** 2)
             en = 1.0 / 2.0 * torch.sum(z**2)
             total_en = g_log_lkhd + en
             z_grad = torch.autograd.grad(total_en, z)[0]
@@ -116,24 +120,17 @@ def main(args):
 
     bs = 5000
 
-    z0 = np.random.randn(1, 2)
-    z1 = np.random.randn(1, 2)
-    z2 = np.random.randn(1, 2)
+    zk_pos = torch.randn(bs, 2).cuda()
+    x = G(zk_pos)
+    for i in range(10):
+        zk_pos = sample_langevin_post_z_with_mvn(
+            zk_pos, x, 100, True, 0.2, verbose = False
+        )
 
-    np.save('{}/z_init.npy'.format(img_dir), np.array([z0, z1, z2]))
-
-    z0 = np.ones((bs, 2)) * z0
-    z1 = np.ones((bs, 2)) * z1
-    z2 = np.ones((bs, 2)) * z2
-
-    z = np.concatenate([z0, z1, z2], axis=0)
-
-    x = G(torch.tensor(z).float().cuda()).cpu().numpy()
-
-    plt_samples(
-        samples=x,
-        filename='{}/lang_post_toy_gt.png'.format(img_dir)
-    )
+        plt_samples(
+            samples=zk_pos,
+            filename='{}/{}_lang_post_toy_gt.png'.format(img_dir, i)
+        )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()

@@ -116,7 +116,8 @@ def main(args):
         mystr = "Step/cross_entropy/recons_loss: "
   
         for i in range(g_l_steps):
-            g_log_lkhd = log_p_x_z(z, x).sum()
+            x_hat = G(z)
+            g_log_lkhd = 1.0 / (2.0 * .25 ** 2) * torch.sum((x_hat - x) ** 2)
             en = 1.0 / 2.0 * torch.sum(z**2)
             total_en = g_log_lkhd + en
             z_grad = torch.autograd.grad(total_en, z)[0]
