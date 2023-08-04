@@ -77,6 +77,25 @@ def main(args):
     netG = G()
     netG.cuda()
 
+    def sample_z(batch_size):
+        radial_std = 0.3
+        tangential_std = 0.1
+        num_classes = 5
+        num_per_class = batch_size // num_classes
+        rate = 0.25
+        rads = np.linspace(0, 2 * np.pi, num_classes, endpoint=False)
+
+        features = rng.randn(num_classes*num_per_class, 2) \
+                 * np.array([radial_std, tangential_std])
+        features[:, 0] += 1.
+        labels = np.repeat(np.arange(num_classes), num_per_class)
+
+        angles = rads[labels] + rate * np.exp(features[:, 0])
+        rotations = np.stack([np.cos(angles), -np.sin(angles), np.sin(angles), np.cos(angles)])
+        rotations = np.reshape(rotations.T, (-1, 2, 2))
+
+        return 2 * rng.permutation(np.einsum("ti,tij->tj", features, rotations))
+
     def sample_langevin_post_z_with_mvn(
             z, x, g_l_steps, g_l_with_noise, g_l_step_size, verbose = False
         ):
@@ -123,7 +142,8 @@ def main(args):
 
     bs = 5000
 
-    zk_pos = torch.randn(bs, 2).cuda()
+    zk_pos = torch.tensor(sample_z(bs).float()).cuda()
+    print(zk_pos.shape)
     x = netG(zk_pos) + torch.randn_like(zk_pos) * .25
     for i in range(10):
         zk_pos.requires_grad = True
