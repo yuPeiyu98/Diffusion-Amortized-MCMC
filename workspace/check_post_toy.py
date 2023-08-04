@@ -124,7 +124,7 @@ def main(args):
 
     z = np.concatenate([z0, z1, z2], axis=0)
 
-    x = G(torch.tensor(z).cuda()).cpu().numpy()
+    x = G(torch.tensor(z).float().cuda()).cpu().numpy()
 
     plt_samples(
         samples=x,
