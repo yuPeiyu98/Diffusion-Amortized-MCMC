@@ -132,7 +132,7 @@ def main(args):
         )
 
         plt_samples(
-            samples=zk_pos,
+            samples=zk_pos.cpu().detach().numpy(),
             filename='{}/{}_lang_post_toy_gt.png'.format(img_dir, i)
         )
 
