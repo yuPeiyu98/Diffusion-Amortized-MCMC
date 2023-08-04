@@ -1094,6 +1094,8 @@ class _netQ_U_toy(nn.Module):
             nn.ReLU(),
             nn.Linear(128, 128),
             nn.ReLU(),
+            nn.Linear(128, 128),
+            nn.ReLU(),
             nn.Linear(128, nxemb)
         )
 

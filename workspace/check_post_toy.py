@@ -72,7 +72,8 @@ def main(args):
     os.makedirs(ckpt_dir, exist_ok=True)
     shutil.copyfile(__file__, os.path.join(args.log_path, args.dataset, timestamp, osp.basename(__file__)))
 
-    G.cuda()
+    netG = G()
+    netG.cuda()
 
     def sample_langevin_post_z_with_mvn(
             z, x, g_l_steps, g_l_with_noise, g_l_step_size, verbose = False
@@ -80,7 +81,7 @@ def main(args):
         mystr = "Step/cross_entropy/recons_loss: "
   
         for i in range(g_l_steps):
-            x_hat = G(z)
+            x_hat = netG(z)
             g_log_lkhd = 1.0 / (2.0 * .25 ** 2) * torch.sum((x_hat - x) ** 2)
             en = 1.0 / 2.0 * torch.sum(z**2)
             total_en = g_log_lkhd + en
@@ -121,7 +122,7 @@ def main(args):
     bs = 5000
 
     zk_pos = torch.randn(bs, 2).cuda()
-    x = G(zk_pos)
+    x = netG(zk_pos)
     for i in range(10):
         zk_pos = sample_langevin_post_z_with_mvn(
             zk_pos, x, 100, True, 0.2, verbose = False

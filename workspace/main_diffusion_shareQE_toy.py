@@ -25,6 +25,31 @@ from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffus
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
+class G(nn.Module):
+    def __init__(self, args):
+        super(G, self).__init__()
+
+        self.l1 = nn.Linear(2, 128),
+        self.l2 = nn.Linear(128, 128)
+        self.l3 = nn.Linear(128, 128)
+        self.l4 = nn.Linear(128, 2)
+        
+        for m in [self.l1, self.l2, self.l3, self.l4]:
+            self.init_data(m)
+        
+    def init_data(self, module):
+        w = module.weight
+        b = module.bias
+
+        module.weight.data.copy_(torch.randn_like(w) * 0.2)
+        module.bias.data.copy_(torch.randn_like(b) * 0.1)
+
+    def forward(self, z):
+        z = F.relu(self.l1(z))
+        z = F.relu(self.l2(z))
+        z = F.relu(self.l3(z))
+        return self.l4(z)
+
 #################### training #####################################
 
 def main(args):
@@ -85,30 +110,8 @@ def main(args):
     rho = 0.005
     p_mask = args.p_mask
 
-    S = np.array([
-        [0.7, 0.6],
-        [0.7, 0.8]
-    ])
-    S_inv = np.linalg.inv(S)
-    L = np.linalg.cholesky(S)
-
-    # (1, 2, 2)
-    S_inv_torch = torch.tensor(S_inv).float().unsqueeze(0).cuda()
-    L_torch = torch.tensor(L).float().unsqueeze(0).cuda()
-
-    def G(z):
-        # z = torch.randn(bs, 2)
-        u = torch.randn_like(z)
-        return z + torch.matmul(L_torch, u.unsqueeze(2)).squeeze(2)
-
-    def log_p_x_z(z, mu):
-        # z = torch.randn(bs, 2)
-
-        # (bs, 1, 2)
-        m0 = torch.matmul((z - mu).unsqueeze(1), S_inv_torch)
-        # (bs, 1, 1)
-        log_x_z = torch.matmul(m0, (z - mu).unsqueeze(2))
-        return .5 * log_x_z.reshape(-1)
+    netG = G()
+    netG.cuda()
 
     def sample_langevin_post_z_with_mvn(
             z, x, g_l_steps, g_l_with_noise, g_l_step_size, verbose = False
@@ -116,7 +119,7 @@ def main(args):
         mystr = "Step/cross_entropy/recons_loss: "
   
         for i in range(g_l_steps):
-            x_hat = G(z)
+            x_hat = netG(z)
             g_log_lkhd = 1.0 / (2.0 * .25 ** 2) * torch.sum((x_hat - x) ** 2)
             en = 1.0 / 2.0 * torch.sum(z**2)
             total_en = g_log_lkhd + en
@@ -133,13 +136,34 @@ def main(args):
             print(mystr)
         return z.detach()
 
+    def plt_samples(
+        samples, filename, npts=100, 
+        low=-4, high=4, kde=True, kde_bw=.15
+    ):
+        from scipy.stats import gaussian_kde
+        kernel = gaussian_kde(samples.T, bw_method=kde_bw)
+        
+        X, Y = np.mgrid[low:high:100j, low:high:100j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        Z = np.reshape(kernel(positions).T, X.shape)
+
+        fig = plt.figure(figsize=(8, 8))
+        plt.xlim([low, high])
+        plt.ylim([low, high])
+        plt.imshow(Z, cmap='viridis', extent=[low, high, low, high])
+        plt.axis('off')
+        plt.gcf().set_size_inches(8, 8)
+        plt.savefig(
+            fname=filename, bbox_inches='tight', pad_inches=0, dpi=100)
+        plt.close()
+
     start_time = time.time()
 
     # begin training
     bs = 500
     for iteration in range(start_iter, args.iterations + 1):
         z = torch.randn(bs, 2).cuda()
-        x = G(z).detach()
+        x = netG(z).detach()
 
         z_mask_prob = torch.rand((len(x),), device=x.device)
         z_mask = torch.ones(len(x), device=x.device)
@@ -160,7 +184,7 @@ def main(args):
             g_l_step_size=args.g_l_step_size, verbose = (iteration % (args.print_iter * 10) == 0)
         )
         
-        g_loss = log_p_x_z(zk_pos, x).mean()
+        g_loss = torch.sum((netG(zk_pos) - x) ** 2, dim=1).mean()
 
         for __ in range(6):
             # update Q 
@@ -215,11 +239,41 @@ def main(args):
             g_loss_sum = 0
             for i in range(10):
                 z = torch.randn(bs, 2).cuda()
-                x = G(z).detach()
+                x = netG(z).detach()
 
                 with torch.no_grad():
                     z0 = Q(x)
                 zk_pos = z0.detach().clone()
+                zk_pos.requires_grad = True
+                zk_pos = sample_langevin_post_z_with_mvn(
+                            z=zk_pos, x=x, g_l_steps=10, # if out_fid > fid_best else 40, 
+                            g_l_with_noise=True,
+                            g_l_step_size=args.g_l_step_size, verbose=False
+                        )
+
+                g_loss_sum += torch.sum((netG(z) - x) ** 2).item()
+
+                z_list.append(zk_pos)
+
+            print("g_loss (avg) Q: {:.8f}".format(g_loss_sum / (bs * 10)))
+
+            z_ = torch.cat(z_list, dim=0).cpu().detach().numpy()
+
+            plt_samples(
+                samples=z_,
+                filename='{}/{}_lang_post_Q.png'.format(img_dir, iteration)
+            )
+
+            ##########
+
+            z_list = []
+
+            g_loss_sum = 0
+            for i in range(10):
+                z = torch.randn(bs, 2).cuda()
+                x = netG(z).detach()
+
+                zk_pos = torch.randn_like(z)
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_mvn(
                             z=zk_pos, x=x, g_l_steps=100, # if out_fid > fid_best else 40, 
@@ -227,28 +281,18 @@ def main(args):
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
-                g_loss_sum += log_p_x_z(zk_pos, x).sum()
+                g_loss_sum += torch.sum((netG(z) - x) ** 2).item()
 
                 z_list.append(zk_pos)
 
-            print("g_loss (avg): {:.8f}".format(g_loss_sum / (bs * 10)))
+            print("g_loss (avg) L: {:.8f}".format(g_loss_sum / (bs * 10)))
 
             z_ = torch.cat(z_list, dim=0).cpu().detach().numpy()
 
-            low, high = -4, 4
-            fig = plt.figure(figsize=(8, 8))
-            plt.xlim([low, high])
-            plt.ylim([low, high])
-            plt.scatter(z_[:, 0], z_[:, 1])
-            plt.axis('off')
-            plt.gcf().set_size_inches(8, 8)
-            plt.savefig(
-                fname='{}/{}_post_Q.png'.format(img_dir, iteration), 
-                bbox_inches='tight', 
-                pad_inches=0, 
-                dpi=100
+            plt_samples(
+                samples=z_,
+                filename='{}/{}_lang_post_gt.png'.format(img_dir, iteration)
             )
-            plt.close()
 
 
 if __name__ == "__main__":
