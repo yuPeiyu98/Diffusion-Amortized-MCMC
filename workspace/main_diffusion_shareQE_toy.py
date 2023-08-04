@@ -165,7 +165,7 @@ def main(args):
     bs = 500
     for iteration in range(start_iter, args.iterations + 1):
         z = torch.randn(bs, 2).cuda()
-        x = netG(z).detach()
+        x = netG(z).detach() + torch.randn_like(z) * .25
 
         z_mask_prob = torch.rand((len(x),), device=x.device)
         z_mask = torch.ones(len(x), device=x.device)
@@ -241,7 +241,7 @@ def main(args):
             g_loss_sum = 0
             for i in range(10):
                 z = torch.randn(bs, 2).cuda()
-                x = netG(z).detach()
+                x = netG(z).detach() + torch.randn_like(z) * .25
 
                 with torch.no_grad():
                     z0 = Q(x)
