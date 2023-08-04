@@ -93,42 +93,43 @@ def main(args):
             print(mystr)
         return z.detach()
 
-    bs = 5000
+    def plt_samples(
+        samples, filename, npts=100, 
+        low=-4, high=4, kde=True, kde_bw=.15
+    ):
+        from scipy.stats import gaussian_kde
+        kernel = gaussian_kde(samples.T, bw_method=kde_bw)
+        
+        X, Y = np.mgrid[low:high:100j, low:high:100j]
+        positions = np.vstack([X.ravel(), Y.ravel()])
+        Z = np.reshape(kernel(positions).T, X.shape)
 
-    z_list = []
-
-    g_loss_sum = 0
-
-    z = torch.randn(bs, 2).cuda()
-    x = G(z).detach()
-
-    zk_pos = torch.randn_like(z).detach().clone()
-
-    for i in range(10):
-        zk_pos.requires_grad = True
-        zk_pos = sample_langevin_post_z_with_mvn(
-            z=zk_pos, x=x, g_l_steps=100,
-            g_l_with_noise=True,
-            g_l_step_size=args.g_l_step_size, verbose=False
-        )
-
-        z_ = zk_pos.cpu().detach().numpy()
-
-        low, high = -4, 4
         fig = plt.figure(figsize=(8, 8))
         plt.xlim([low, high])
         plt.ylim([low, high])
-        plt.scatter(z_[:, 0], z_[:, 1])
+        plt.imshow(Z, cmap='viridis', extent=[low, high, low, high])
         plt.axis('off')
         plt.gcf().set_size_inches(8, 8)
         plt.savefig(
-            fname='{}/{}_lang_post_toy.png'.format(img_dir, i), 
-            bbox_inches='tight', 
-            pad_inches=0, 
-            dpi=100
-        )
+            fname=filename, bbox_inches='tight', pad_inches=0, dpi=100)
         plt.close()
 
+    bs = 5000
+
+    z0 = np.zeros((bs, 2))
+    z1 = np.zeros((bs, 2))
+    z1[:, 0] = -1
+    z2 = np.zeros((bs, 2))
+    z2[:, 1] = 1
+
+    z = np.concatenate([z0, z1, z2], axis=0)
+
+    x = G(torch.tensor(z).cuda()).cpu().numpy()
+
+    plt_samples(
+        samples=x,
+        filename='{}/lang_post_toy_gt.png'.format(img_dir)
+    )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
