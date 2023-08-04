@@ -116,11 +116,15 @@ def main(args):
 
     bs = 5000
 
-    z0 = np.zeros((bs, 2))
-    z1 = np.zeros((bs, 2))
-    z1[:, 0] = -1
-    z2 = np.zeros((bs, 2))
-    z2[:, 1] = 1
+    z0 = np.random.randn(1, 2)
+    z1 = np.random.randn(1, 2)
+    z2 = np.random.randn(1, 2)
+
+    np.save('{}/z_init.npy'.format(img_dir), np.array([z0, z1, z2]))
+
+    z0 = np.ones((bs, 2)) * z0
+    z1 = np.ones((bs, 2)) * z1
+    z2 = np.ones((bs, 2)) * z2
 
     z = np.concatenate([z0, z1, z2], axis=0)
 
