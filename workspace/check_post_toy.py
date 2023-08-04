@@ -144,7 +144,7 @@ def main(args):
 
     bs = 5000
 
-    zk_pos = torch.tensor(sample_z(bs, args.seed).float()).cuda()
+    zk_pos = torch.tensor(sample_z(bs, args.seed)).float().cuda()
     print(zk_pos.shape)
     x = netG(zk_pos) + torch.randn_like(zk_pos) * .25
     for i in range(10):
