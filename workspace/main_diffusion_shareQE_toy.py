@@ -26,7 +26,7 @@ from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffus
 torch.multiprocessing.set_sharing_strategy('file_system')
 
 class G(nn.Module):
-    def __init__(self, args):
+    def __init__(self):
         super(G, self).__init__()
 
         self.l1 = nn.Linear(2, 128),
