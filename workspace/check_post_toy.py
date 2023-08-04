@@ -41,8 +41,8 @@ class G(nn.Module):
             self.init_data(m)
         
     def init_data(self, module):
-        w = module.weight
-        b = module.bias
+        w = module.weight.data
+        b = module.bias.data
 
         module.weight.data.copy_(torch.randn_like(w) * 0.2)
         module.bias.data.copy_(torch.randn_like(b) * 0.1)
