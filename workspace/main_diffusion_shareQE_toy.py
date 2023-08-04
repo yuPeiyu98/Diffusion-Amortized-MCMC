@@ -138,6 +138,25 @@ def main(args):
             print(mystr)
         return z.detach()
 
+    def sample_z(batch_size, seed):
+        rng = np.random.RandomState(seed)
+
+        radial_std = 0.3
+        tangential_std = 0.1
+        num_classes = 5
+        num_per_class = batch_size // num_classes
+        rate = 0.25
+        rads = np.linspace(0, 2 * np.pi, num_classes, endpoint=False)
+
+        features = rng.randn(num_classes*num_per_class, 2) \
+                 * np.array([radial_std, tangential_std])
+        features[:, 0] += 1.
+        labels = np.repeat(np.arange(num_classes), num_per_class)
+
+        angles = rads[labels] + rate * np.exp(features[:, 0])
+        rotations = np.stack([np.cos(angles), -np.sin(angles), np.sin(angles), np.cos(angles)])
+        rotations = np.reshape(rotations.T, (-1, 2, 2))
+
     def plt_samples(
         samples, filename, npts=100, 
         low=-4, high=4, kde=True, kde_bw=.15
@@ -164,7 +183,7 @@ def main(args):
     # begin training
     bs = 500
     for iteration in range(start_iter, args.iterations + 1):
-        z = torch.randn(bs, 2).cuda()
+        z = torch.tensor(sample_z(bs, args.seed)).float().cuda()
         x = netG(z).detach() + torch.randn_like(z) * .25
 
         z_mask_prob = torch.rand((len(x),), device=x.device)
@@ -236,11 +255,14 @@ def main(args):
         if iteration % args.fid_iter == 0:
             bs = 500
 
-            z_list = []
+            zq_list = []
+            zl_list = []
 
-            g_loss_sum = 0
+            g_q_loss_sum = 0
+            g_l_loss_sum = 0
+
             for i in range(10):
-                z = torch.randn(bs, 2).cuda()
+                z = torch.tensor(sample_z(bs, args.seed + iteration)).float().cuda()
                 x = netG(z).detach() + torch.randn_like(z) * .25
 
                 with torch.no_grad():
@@ -253,27 +275,8 @@ def main(args):
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
-                g_loss_sum += torch.sum((netG(z) - x) ** 2).item()
-
-                z_list.append(zk_pos)
-
-            print("g_loss (avg) Q: {:.8f}".format(g_loss_sum / (bs * 10)))
-
-            z_ = torch.cat(z_list, dim=0).cpu().detach().numpy()
-
-            plt_samples(
-                samples=z_,
-                filename='{}/{}_lang_post_Q.png'.format(img_dir, iteration)
-            )
-
-            ##########
-
-            z_list = []
-
-            g_loss_sum = 0
-            for i in range(10):
-                z = torch.randn(bs, 2).cuda()
-                x = netG(z).detach()
+                g_q_loss_sum += torch.sum((netG(zk_pos) - x) ** 2).item()
+                zq_list.append(zk_pos)
 
                 zk_pos = torch.randn_like(z)
                 zk_pos.requires_grad = True
@@ -283,19 +286,26 @@ def main(args):
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
-                g_loss_sum += torch.sum((netG(z) - x) ** 2).item()
+                g_l_loss_sum += torch.sum((netG(zk_pos) - x) ** 2).item()
+                zl_list.append(zk_pos)
 
-                z_list.append(zk_pos)
+            print("g_loss (avg) Q: {:.8f}".format(g_q_loss_sum / (bs * 10)))
 
-            print("g_loss (avg) L: {:.8f}".format(g_loss_sum / (bs * 10)))
+            print("g_loss (avg) L: {:.8f}".format(g_l_loss_sum / (bs * 10)))
 
-            z_ = torch.cat(z_list, dim=0).cpu().detach().numpy()
+            z_q = torch.cat(zq_list, dim=0).cpu().detach().numpy()
+
+            z_l = torch.cat(zl_list, dim=0).cpu().detach().numpy()
 
             plt_samples(
-                samples=z_,
-                filename='{}/{}_lang_post_gt.png'.format(img_dir, iteration)
+                samples=z_q,
+                filename='{}/{}_lang_post_Q.png'.format(img_dir, iteration)
             )
 
+            plt_samples(
+                samples=z_l,
+                filename='{}/{}_lang_post_gt.png'.format(img_dir, iteration)
+            )
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
