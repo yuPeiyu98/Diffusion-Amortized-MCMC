@@ -109,7 +109,7 @@ def main(args):
     
     q_lr = args.q_lr
     e_lr = args.e_lr
-    rho = 0.75 # 0.5 # 0.005
+    rho = 0.005
     p_mask = args.p_mask
 
     netG = G()
@@ -143,7 +143,7 @@ def main(args):
 
         radial_std = 0.3
         tangential_std = 0.1
-        num_classes = 2
+        num_classes = 5
         num_per_class = batch_size // num_classes
         rate = 0.25
         rads = np.linspace(0, 2 * np.pi, num_classes, endpoint=False)
@@ -272,7 +272,7 @@ def main(args):
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_mvn(
-                            z=zk_pos, x=x, g_l_steps=0, # if out_fid > fid_best else 40, 
+                            z=zk_pos, x=x, g_l_steps=10, # if out_fid > fid_best else 40, 
                             g_l_with_noise=True,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
@@ -283,7 +283,7 @@ def main(args):
                 zk_pos = torch.randn_like(z)
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_mvn(
-                            z=zk_pos, x=x, g_l_steps=1000, # if out_fid > fid_best else 40, 
+                            z=zk_pos, x=x, g_l_steps=100, # if out_fid > fid_best else 40, 
                             g_l_with_noise=True,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
@@ -337,7 +337,7 @@ if __name__ == "__main__":
     parser.add_argument('--diffusion_residual', type=bool, default=True, help='whether treat prediction as residual in latent diffusion model')
     parser.add_argument('--var_type', type=str, default='large', help='variance type of latent diffusion')
     parser.add_argument('--Q_with_noise', type=bool, default=True, help='whether include noise during inference')
-    parser.add_argument('--p_mask', type=float, default=0.1, help='probability of prior model')
+    parser.add_argument('--p_mask', type=float, default=0.2, help='probability of prior model')
     parser.add_argument('--cond_w', type=float, default=0.0, help='weight of conditional guidance')
     
     # MCMC related parameters
@@ -363,7 +363,7 @@ if __name__ == "__main__":
     parser.add_argument('--print_iter', type=int, default=100, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
     parser.add_argument('--ckpt_iter', type=int, default=50000, help='number of iterations between each ckpt saving')
-    parser.add_argument('--fid_iter', type=int, default=100, help='number of iterations between each fid computation')
+    parser.add_argument('--fid_iter', type=int, default=500, help='number of iterations between each fid computation')
 
     args = parser.parse_args()
     main(args)
