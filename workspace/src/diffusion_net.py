@@ -173,7 +173,7 @@ class ResBlock(nn.Module):
             )
         )
 
-    def forward(x):
+    def forward(self, x):
         return self.model(x) + x
 
 class _netG_cifar10_deep_res(nn.Module):
