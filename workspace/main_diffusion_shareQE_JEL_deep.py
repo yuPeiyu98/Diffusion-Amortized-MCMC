@@ -18,7 +18,7 @@ import datetime as dt
 import re
 from data.dataset import MNIST
 from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.diffusion_net import Generator, _netG_cifar10_deep
+from src.diffusion_net import Generator, _netG_cifar10_deep, _netG_cifar10_deep_res
 from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
 from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid
 
