@@ -162,6 +162,7 @@ class _netG_cifar10_deep(nn.Module):
 
 class ResBlock(nn.Module):
     def __init__(self, nf, use_spc_norm=False):
+        super().__init__()
         f = nn.LeakyReLU(0.2)
 
         self.model = nn.Sequential(
