@@ -167,7 +167,7 @@ class ResBlock(nn.Module):
         self.model = nn.Sequential(
             f,
             spectral_norm(
-                nn.ConvTranspose2d(ngf, ngf, 3, 1, 1),
+                nn.ConvTranspose2d(nf, nf, 3, 1, 1),
                 use_spc_norm
             )
         )
