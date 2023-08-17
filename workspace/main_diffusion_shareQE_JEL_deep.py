@@ -427,7 +427,7 @@ if __name__ == "__main__":
     parser.add_argument('--e_max_norm', type=float, default=100, help='max norm allowed')
     parser.add_argument('--g_max_norm', type=float, default=100, help='max norm allowed')
     parser.add_argument('--iterations', type=int, default=1000000, help='total number of training iterations')
-    parser.add_argument('--print_iter', type=int, default=1, help='number of iterations between each print')
+    parser.add_argument('--print_iter', type=int, default=20, help='number of iterations between each print')
     parser.add_argument('--plot_iter', type=int, default=1000, help='number of iterations between each plot')
     parser.add_argument('--ckpt_iter', type=int, default=50000, help='number of iterations between each ckpt saving')
     parser.add_argument('--fid_iter', type=int, default=100, help='number of iterations between each fid computation')
