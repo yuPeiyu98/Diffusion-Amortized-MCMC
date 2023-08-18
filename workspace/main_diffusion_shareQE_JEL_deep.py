@@ -129,7 +129,8 @@ def main(args):
     # define models
     if args.dataset == 'cifar10':
         # G = _netG_cifar10(nz=args.nz, ngf=args.ngf, nc=args.nc)
-        G = _netG_cifar10_deep(nz=args.nz, ngf=args.ngf, nc=args.nc)
+        # G = _netG_cifar10_deep(nz=args.nz, ngf=args.ngf, nc=args.nc)
+        G = _netG_cifar10_deep_res(nz=args.nz, ngf=args.ngf, nc=args.nc)
         # G = Generator(z_dim=args.nz)
     elif args.dataset == 'svhn':
         G = _netG_svhn(nz=args.nz, ngf=args.ngf, nc=args.nc)
