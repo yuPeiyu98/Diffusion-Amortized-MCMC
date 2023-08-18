@@ -60,7 +60,7 @@ def main(args):
         args.nz = 128
         args.ngf = 128
         trainset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_train)
-        testset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
+        testset = torchvision.datasets.CIFAR10(root=args.data_path, train=True, download=True, transform=transform_test)
         mset = torchvision.datasets.CIFAR10(root=args.data_path, train=False, download=True, transform=transform_test)
     elif args.dataset == 'svhn':
         args.nz = 100
@@ -322,11 +322,11 @@ def main(args):
         if iteration % args.fid_iter == 0:
             fid_s_time = time.time()
             out_fid = calculate_fid_with_diffusion_prior(
-                n_samples=5000, # args.n_fid_samples, 
+                n_samples=args.n_fid_samples, 
                 device=z0.device, netQ=Q, netG=G, netE=E,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, iteration), bs=args.batch_size)
             out_fid_ = calculate_fid(
-                n_samples=5000, # args.n_fid_samples, 
+                n_samples=args.n_fid_samples, 
                 nz=args.nz, netG=G, netE=E,
                 e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
                 real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"), bs=args.batch_size)
@@ -388,7 +388,7 @@ if __name__ == "__main__":
     # data related parameters
     parser.add_argument('--batch_size', type=int, default=128, help='batch size')
     parser.add_argument('--nc', type=int, default=3, help='image channel')
-    parser.add_argument('--n_fid_samples', type=int, default=10000, help='number of samples for calculating fid during training')
+    parser.add_argument('--n_fid_samples', type=int, default=50000, help='number of samples for calculating fid during training')
     
     # network structure related parameters
     parser.add_argument('--nz', type=int, default=128, help='z vector length')
