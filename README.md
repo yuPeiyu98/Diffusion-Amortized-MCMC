@@ -1,5 +1,6 @@
 # Learning Energy-Based Prior Model with Diffusion-Amortized MCMC
-<img src="toy_example.PNG" alt="teaser" width="50%" />
+<img src="teaser.png" alt="teaser" width="50%" />
+<img src="toy_example.png" alt="toy_example" width="50%" />
 
 [[Paper]()] [[Code](https://github.com/yuPeiyu98/DiffAMC)]
 
