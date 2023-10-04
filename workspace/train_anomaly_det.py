@@ -1,4 +1,4 @@
-# Use both diffusion model (seperate models) as prior and posterior
+##### Training script for anomaly detection on MNIST
 
 import argparse
 import numpy as np
@@ -17,15 +17,14 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import MNIST
-from src.diffusion_net import _netG_mnist, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z, sample_langevin_post_z_with_gaussian
-from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
+from src.diffusion_net import _netG_mnist, _netE, _netQ_U
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z
 
 from sklearn.metrics import roc_curve, precision_recall_curve, auc
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-#################### training #####################################
+#################### training ####################
 
 def main(args):
 
@@ -46,7 +45,7 @@ def main(args):
     os.makedirs(ckpt_dir, exist_ok=True)
     shutil.copyfile(__file__, os.path.join(args.log_path, args.dataset, timestamp, osp.basename(__file__)))
 
-    # load dataset and calculate statistics
+    # load dataset
     transform_train = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5), (0.5))
@@ -72,13 +71,7 @@ def main(args):
         diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
         logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
         net_arch='A', dataset=args.dataset)
-    Q_eval = _netQ_U(nc=args.nc, nz=args.nz, nxemb=args.nxemb, ntemb=args.ntemb, nif=args.nif, \
-        diffusion_residual=args.diffusion_residual, n_interval=args.n_interval_posterior, 
-        logsnr_min=args.logsnr_min, logsnr_max=args.logsnr_max, var_type=args.var_type, with_noise=args.Q_with_noise, cond_w=args.cond_w,
-        net_arch='A', dataset=args.dataset)
     for param, target_param in zip(Q.parameters(), Q_dummy.parameters()):
-        target_param.data.copy_(param.data)
-    for param, target_param in zip(Q.parameters(), Q_eval.parameters()):
         target_param.data.copy_(param.data)
 
     E = _netE(nz=args.nz)
@@ -87,7 +80,6 @@ def main(args):
     Q.cuda()
     E.cuda()
     Q_dummy.cuda()
-    Q_eval.cuda()
 
     G_optimizer = optim.Adam(G.parameters(), lr=args.g_lr, betas=(0.5, 0.999))
     Q_optimizer = optim.AdamW(Q.parameters(), weight_decay=0, lr=args.q_lr, betas=(0.5, 0.999))
@@ -119,12 +111,6 @@ def main(args):
             train_iter = iter(trainloader)
             x, idx = next(train_iter)
         x = x.cuda()
-        # print(idx)
-
-        # z_mask_prob = torch.rand((len(x),), device=x.device)
-        # z_mask = torch.ones(len(x), device=x.device)
-        # z_mask[z_mask_prob < p_mask] = 0.0
-        # z_mask = z_mask.unsqueeze(-1)
 
         Q.eval()
         G.eval()
@@ -172,7 +158,7 @@ def main(args):
         E_optimizer.zero_grad()
         E.train()
         e_pos, e_neg = E(zk_pos), E(zk_neg)
-        E_loss = e_pos.mean() - e_neg.mean() # + ((e_pos ** 2).mean() + (e_neg ** 2).mean()) * 1e-4
+        E_loss = e_pos.mean() - e_neg.mean()
         E_loss.backward()
         if args.e_is_grad_clamp:
             torch.nn.utils.clip_grad_norm_(E.parameters(), max_norm=args.e_max_norm)
@@ -199,8 +185,6 @@ def main(args):
                 target_param.data.copy_(rho * param.data + (1 - rho) * target_param.data)
 
         if iteration % args.print_iter == 0:
-            # print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
-            #     iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print("Iter {} time {:.2f} g_loss {:.6f} q_loss {:.3f} g_lr {:.8f} q_lr {:.8f}".format(
                 iteration, time.time() - start_time, g_loss.item(), Q_loss.item(), g_lr, q_lr))
             print(zk_pos.max(), zk_pos.min())
@@ -213,7 +197,6 @@ def main(args):
                 'Q_state_dict': Q.state_dict(),
                 'Q_optimizer': Q_optimizer.state_dict(),
                 'Q_dummy_state_dict': Q_dummy.state_dict(),
-                'Q_eval_state_dict': Q_eval.state_dict(),
                 'E_state_dict': E.state_dict(),
                 'E_optimizer': E_optimizer.state_dict(),
                 'iter': iteration
@@ -232,7 +215,7 @@ def main(args):
                 zk_pos = z0.detach().clone()
                 zk_pos.requires_grad = True
                 zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, 
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
@@ -257,7 +240,6 @@ def main(args):
                     'Q_state_dict': Q.state_dict(),
                     'Q_optimizer': Q_optimizer.state_dict(),
                     'Q_dummy_state_dict': Q_dummy.state_dict(),
-                    'Q_eval_state_dict': Q_eval.state_dict(),
                     'E_state_dict': E.state_dict(),
                     'E_optimizer': E_optimizer.state_dict(),
                     'iter': iteration

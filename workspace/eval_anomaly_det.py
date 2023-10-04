@@ -1,4 +1,4 @@
-# Use both diffusion model (seperate models) as prior and posterior
+##### Evaluation script for anomaly detection on MNIST
 
 import argparse
 import numpy as np
@@ -17,15 +17,14 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import MNIST
-from src.diffusion_net import _netG_mnist, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_prior_mh, sample_langevin_post_z_with_gaussian
-from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior
+from src.diffusion_net import _netG_mnist, _netE, _netQ_U
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z
 
 from sklearn.metrics import roc_curve, precision_recall_curve, auc
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-#################### training #####################################
+#################### evaluation ####################
 
 def main(args):
 
@@ -46,7 +45,7 @@ def main(args):
     os.makedirs(ckpt_dir, exist_ok=True)
     shutil.copyfile(__file__, os.path.join(args.resume_path, osp.basename(__file__)))
 
-    # load dataset and calculate statistics
+    # load dataset
     transform_test = transforms.Compose([
         transforms.ToTensor(),
         transforms.Normalize((0.5), (0.5))
@@ -107,7 +106,7 @@ def main(args):
         zk_pos = z0.detach().clone()
         zk_pos.requires_grad = True
         zk_pos = sample_langevin_post_z_with_prior(
-                    z=zk_pos, x=x, netG=G, netE=E, g_l_steps=5, # if out_fid > fid_best else 40, 
+                    z=zk_pos, x=x, netG=G, netE=E, g_l_steps=5,
                     g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                     g_l_step_size=args.g_l_step_size, verbose=False
                 )
@@ -142,7 +141,7 @@ if __name__ == "__main__":
     parser.add_argument('--label', type=int, default=4, help='held out digit')
     
     # network structure related parameters
-    parser.add_argument('--nz', type=int, default=100, help='z vector length')
+    parser.add_argument('--nz', type=int, default=8, help='z vector length')
     parser.add_argument('--ngf', type=int, default=128, help='base channel numbers in G')
     parser.add_argument('--nif', type=int, default=128, help='base channel numbers in Q encoder')
     parser.add_argument('--nxemb', type=int, default=1024, help='x embedding dimension in Q')
@@ -163,7 +162,7 @@ if __name__ == "__main__":
     parser.add_argument('--g_l_steps', type=int, default=30, help='number of langevin steps for posterior inference')
     parser.add_argument('--g_l_step_size', type=float, default=0.1, help='stepsize of posterior langevin')
     parser.add_argument('--g_l_with_noise', default=True, type=bool, help='noise term of posterior langevin')
-    parser.add_argument('--g_llhd_sigma', type=float, default=0.1, help='sigma for G loss')
+    parser.add_argument('--g_llhd_sigma', type=float, default=1., help='sigma for G loss')
     parser.add_argument('--e_l_steps', type=int, default=60, help='number of langevin steps for prior sampling')
     parser.add_argument('--e_l_step_size', type=float, default=0.4, help='stepsize of prior langevin')
     parser.add_argument('--e_l_with_noise', default=True, type=bool, help='noise term of prior langevin')

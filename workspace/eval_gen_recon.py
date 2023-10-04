@@ -17,14 +17,13 @@ import shutil
 import datetime as dt
 import re
 from data.dataset import MNIST
-from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ, _netQ_uncond, _netQ_U
-from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_post_z_with_gaussian
-from src.MCMC import gen_samples_with_diffusion_prior, gen_samples
-
+from src.diffusion_net import _netG_cifar10, _netG_svhn, _netG_celeba64, _netG_celebaHQ, _netE, _netQ_U
+from src.MCMC import sample_langevin_post_z_with_prior, sample_langevin_prior_z
+from src.MCMC import gen_samples_with_diffusion_prior, calculate_fid_with_diffusion_prior, calculate_fid
 
 torch.multiprocessing.set_sharing_strategy('file_system')
 
-#################### training #####################################
+#################### evaluation ####################
 
 def main(args):
 
@@ -39,7 +38,7 @@ def main(args):
     timestamp = re.sub(r'[\:-]','', timestamp) # replace unwanted chars 
     timestamp = re.sub(r'[\s]','_', timestamp) # with regex and re.sub
     
-    img_dir = os.path.join(args.resume_path, 'imgs_gen')
+    img_dir = os.path.join(args.resume_path, 'imgs')
     ckpt_dir = os.path.join(args.resume_path, 'ckpt')
     os.makedirs(img_dir, exist_ok=True)
     os.makedirs(ckpt_dir, exist_ok=True)
@@ -105,10 +104,25 @@ def main(args):
         trainset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'train'), transform=transform_train)
         testset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'val'), transform=transform_test) 
         mset = torchvision.datasets.ImageFolder(root=osp.join(args.data_path, 'test'), transform=transform_test)
+
     trainloader = data.DataLoader(trainset, batch_size=args.batch_size, shuffle=True, num_workers=0, drop_last=True)
     testloader = data.DataLoader(testset, batch_size=1, shuffle=False, num_workers=0, drop_last=False)
     mloader = data.DataLoader(mset, batch_size=500, shuffle=False, num_workers=0, drop_last=False)
     train_iter = iter(trainloader)
+    
+    # pre-calculating statistics for fid calculation
+    start_time = time.time()
+    print("Begin calculating real image statistics")
+    fid_data_true = []
+    for x, _ in testloader:
+        fid_data_true.append(x)
+        if len(fid_data_true) >= args.n_fid_samples:
+            break
+    fid_data_true = torch.cat(fid_data_true, dim=0)
+    fid_data_true = (fid_data_true + 1.0) / 2.0
+    real_m, real_s = pfw.get_stats(fid_data_true, device="cuda:0")
+    print("Finish calculating real image statistics {:.3f}".format(time.time() - start_time), fid_data_true.shape, fid_data_true.min(), fid_data_true.max())
+    fid_data_true, testset, testloader = None, None, None
 
     # define models
     if args.dataset == 'cifar10':
@@ -148,55 +162,54 @@ def main(args):
         Q_dummy.load_state_dict(state_dict['Q_dummy_state_dict'])
         E.load_state_dict(state_dict['E_state_dict'])
         
-        dummy = torch.randn(3,3).cuda()
-
-        bs = 64
         fid_s_time = time.time()
-        for i in range(10):
-            cur_samples, _ = gen_samples_with_diffusion_prior(bs, dummy.device, Q, G)
-            fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
-            for j, sample in enumerate(fid_samples):
-                torchvision.utils.save_image(
-                    sample, '{}/fid_diff_{:05d}.png'.format(img_dir, i * bs + j), 
-                    normalize=True)
-        print("Finish calculating fid time {:.3f}".format(time.time() - fid_s_time))
+        out_fid = calculate_fid_with_diffusion_prior(
+            n_samples=args.n_fid_samples, device=x.cuda().device, netQ=Q, netG=G, netE=E,
+            real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
+        print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
 
-        bs = 64
-        fid_s_time = time.time()
-        for i in range(10):
-            cur_samples = gen_samples(bs, args.nz, E, G, args.e_l_steps, args.e_l_step_size, args.e_l_with_noise)
-            fid_samples = (1.0 + torch.clamp(cur_samples, min=-1.0, max=1.0)) / 2.0
-            for j, sample in enumerate(fid_samples):
-                torchvision.utils.save_image(
-                    sample, '{}/fid_ebm_{:05d}.png'.format(img_dir, i * bs + j), 
-                    normalize=True)
-        print("Finish calculating fid time {:.3f}".format(time.time() - fid_s_time))
+        out_fid = calculate_fid(
+            n_samples=args.n_fid_samples, nz=args.nz, netG=G, netE=E,
+            e_l_steps=args.e_l_steps, e_l_step_size=args.e_l_step_size, e_l_with_noise=args.e_l_with_noise,
+            real_m=real_m, real_s=real_s, save_name='{}/fid_samples_{}.png'.format(img_dir, "test"))
+        print("Finish calculating fid time {:.3f} fid {:.3f} / {:.3f}".format(time.time() - fid_s_time, out_fid, fid_best))
+
+        mse_lss = 0.0
+        mse_s_time = time.time()
 
         for x, _ in mloader:
             x = x.cuda()
-
-            mse_s_time = time.time()
             with torch.no_grad():
                 z0 = Q(x)
             zk_pos = z0.detach().clone()
             zk_pos.requires_grad = True
             zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10, # if out_fid > fid_best else 40, 
-                            g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
-                            g_l_step_size=args.g_l_step_size, verbose=False
-                        )
-            t = time.time() - mse_s_time
-
-            mse_l_time = time.time()
-            zk_pos.requires_grad = True
-            zk_pos = sample_langevin_post_z_with_prior(
-                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=100, # if out_fid > fid_best else 40, 
+                            z=zk_pos, x=x, netG=G, netE=E, g_l_steps=10,
                             g_llhd_sigma=args.g_llhd_sigma, g_l_with_noise=False,
                             g_l_step_size=args.g_l_step_size, verbose=False
                         )
 
-            print("Finish calculating mse Q time {:.3f} langevin time {:.3f}".format(t, time.time() - mse_l_time))
-            break
+            with torch.no_grad():
+                x_hat = G(zk_pos)
+                g_loss = torch.mean((x_hat - x) ** 2, dim=[1,2,3]).sum()
+
+            if save_recon_imgs:
+                with torch.no_grad():
+                    x_hat_q = G(z0)
+                save_images = x[:64].detach().cpu()
+                torchvision.utils.save_image(
+                    torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_obs.png'.format(img_dir, iteration), normalize=True, nrow=8)
+                save_images = x_hat[:64].detach().cpu()
+                torchvision.utils.save_image(
+                    torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post.png'.format(img_dir, iteration), normalize=True, nrow=8)
+                save_images = x_hat_q[:64].detach().cpu()
+                torchvision.utils.save_image(
+                    torch.clamp(save_images, min=-1.0, max=1.0), '{}/{}_post_Q.png'.format(img_dir, iteration), normalize=True, nrow=8)
+
+            mse_lss += g_loss.item()
+
+        mse_lss /= len(mset)
+        print("Finish calculating mse time {:.3f} mse {:.3f}".format(time.time() - mse_s_time, mse_lss))
 
 
 if __name__ == "__main__":

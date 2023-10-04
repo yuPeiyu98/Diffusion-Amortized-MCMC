@@ -1,7 +1,6 @@
 import numpy as np
 import os
 import os.path as osp
-import pandas as pd
 import random
 import torch
 import torchvision
