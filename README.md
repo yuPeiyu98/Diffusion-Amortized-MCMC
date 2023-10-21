@@ -2,7 +2,7 @@
 <img src="teaser.png" alt="teaser" width="50%" />
 <img src="toy_example.png" alt="toy_example" width="50%" />
 
-[[Paper]()] [[Code](https://github.com/yuPeiyu98/DiffAMC)]
+[[Paper](https://arxiv.org/abs/2310.03218)] [[Code](https://github.com/yuPeiyu98/DiffAMC)]
 
 The official code repository for NeurIPS 2023 paper "Learning Energy-Based Prior Model with Diffusion-Amortized MCMC".
 
@@ -96,10 +96,10 @@ For some random seeds, the default 1000-step langevin dynamics for sampling grou
 
 ## Citation
 ```
-@inproceedings{yu2023learning,
-  author = {Yu, Peiyu and Zhu, Yaxuan and Xie, Sirui and Ma, Xiaojian and Gao, Ruiqi and Zhu, Song-Chun and Wu, Ying Nian},
-  title = {Learning Energy-Based Prior Model with Diffusion-Amortized MCMC},
-  booktitle = {Advances in Neural Information Processing Systems (NeurIPS)},
-  year = {2023}
+@article{yu2023learning,
+  title={Learning Energy-Based Prior Model with Diffusion-Amortized MCMC},
+  author={Yu, Peiyu and Zhu, Yaxuan and Xie, Sirui and Ma, Xiaojian and Gao, Ruiqi and Zhu, Song-Chun and Wu, Ying Nian},
+  journal={arXiv preprint arXiv:2310.03218},
+  year={2023}
 }
 ```
